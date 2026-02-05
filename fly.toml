@@ -1,0 +1,39 @@
+# Fly.io configuration for MCPJam Inspector with Playwright
+# Deploy: fly deploy --dockerfile Dockerfile.agntux
+
+app = "mcpjam-agntux"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.agntux"
+
+# Environment variables
+# Note: Secrets (API keys, tokens) should be set via `fly secrets set`
+# Example: fly secrets set AGNTUX_API_KEY=xxx
+[env]
+  NODE_ENV = "production"
+  AGNTUX_MODE = "true"
+  PORT = "6274"
+  DOCKER_CONTAINER = "true"
+
+[http_service]
+  internal_port = 6274
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "15s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "10s"
+
+# Playwright requires more memory for browser automation
+# 2GB recommended for stable Chromium operation
+[[vm]]
+  memory = "2048mb"
+  cpu_kind = "shared"
+  cpus = 1

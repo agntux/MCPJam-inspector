@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 // Import routes
 import mcpRoutes from "./routes/mcp/index.js";
 import appsRoutes from "./routes/apps/index.js";
+import agntuxRoutes from "../agntux/api/index.js";
 import { MCPClientManager } from "@mcpjam/sdk";
 import { initElicitationCallback } from "./routes/mcp/elicitation.js";
 import { rpcLogBus } from "./services/rpc-log-bus.js";
@@ -166,6 +167,7 @@ export function createHonoApp() {
   // API Routes
   app.route("/api/apps", appsRoutes);
   app.route("/api/mcp", mcpRoutes);
+  app.route("/api/agntux", agntuxRoutes);
 
   // Health check
   app.get("/health", (c) => {

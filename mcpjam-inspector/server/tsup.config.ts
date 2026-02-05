@@ -39,6 +39,10 @@ export default defineConfig({
     // Packages with dynamic requires
     "chalk",
     "supports-color",
+    // Playwright must remain external (browser automation runtime)
+    "playwright",
+    "playwright-core",
+    "@playwright/test",
   ],
   noExternal: [
     // Force bundling of problematic packages

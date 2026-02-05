@@ -1,0 +1,43 @@
+# Node modules (will be installed fresh in container)
+**/node_modules
+
+# Git
+.git
+.gitignore
+
+# Development files
+**/.env*
+!**/.env.example
+**/*.log
+**/coverage
+**/.nyc_output
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts (will be rebuilt)
+**/dist
+**/.cache
+**/.parcel-cache
+
+# Test files
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Documentation
+*.md
+!README.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Misc
+*.tgz
+*.tar.gz

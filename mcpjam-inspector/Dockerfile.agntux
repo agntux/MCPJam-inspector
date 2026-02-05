@@ -1,0 +1,53 @@
+# MCPJam Inspector with Playwright for AgntUX Visual Testing
+# Based on Playwright image for browser automation support
+# Playwright version must match @playwright/test in package.json
+
+FROM mcr.microsoft.com/playwright:v1.54.2-jammy
+
+# Install Node.js 20 (Playwright image has curl pre-installed)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g npm@latest
+
+# Create non-root user for security
+RUN groupadd --gid 1000 appuser \
+    && useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
+
+WORKDIR /app
+
+# Copy SDK first (it's a dependency)
+COPY --chown=appuser:appuser sdk/package*.json ./sdk/
+RUN cd sdk && npm ci --legacy-peer-deps
+
+COPY --chown=appuser:appuser sdk/ ./sdk/
+RUN cd sdk && npm run build
+
+# Copy MCPJam Inspector
+COPY --chown=appuser:appuser mcpjam-inspector/package*.json ./mcpjam-inspector/
+RUN cd mcpjam-inspector && npm ci --legacy-peer-deps
+
+COPY --chown=appuser:appuser mcpjam-inspector/ ./mcpjam-inspector/
+
+# Build the inspector
+RUN cd mcpjam-inspector && npm run build
+
+# Switch to non-root user
+USER appuser
+
+WORKDIR /app/mcpjam-inspector
+
+# Environment
+ENV NODE_ENV=production
+ENV AGNTUX_MODE=true
+ENV PORT=6274
+ENV DOCKER_CONTAINER=true
+
+EXPOSE 6274
+
+# Health check using main server endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:6274/health || exit 1
+
+CMD ["node", "dist/server/index.js"]
