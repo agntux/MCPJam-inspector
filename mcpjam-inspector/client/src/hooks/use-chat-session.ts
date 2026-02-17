@@ -146,10 +146,11 @@ export function useChatSession({
     onResetRef.current = onReset;
   }, [onReset]);
   const convexAuth = useConvexAuth();
-  // AgntUX: When Convex is not configured (self-hosted mode), skip auth entirely
+  // AgntUX START — When Convex is not configured (self-hosted mode), skip auth entirely
   const hasConvex = Boolean(import.meta.env.VITE_CONVEX_URL);
   const isAuthenticated = hasConvex ? convexAuth.isAuthenticated : false;
   const isAuthLoading = hasConvex ? convexAuth.isLoading : false;
+  // AgntUX END
   const {
     hasToken,
     getToken,
@@ -159,7 +160,7 @@ export function useChatSession({
   } = useAiProviderKeys();
   const { customProviders, getCustomProviderByName } = useCustomProviders();
 
-  // AgntUX: Fetch server-side provider list (which providers have server-side API keys)
+  // AgntUX START — Fetch server-side provider list (which providers have server-side API keys)
   const [serverProviders, setServerProviders] = useState<string[]>([]);
   useEffect(() => {
     fetch("/api/config/server-providers")
@@ -167,6 +168,7 @@ export function useChatSession({
       .then((data) => setServerProviders(data.providers ?? []))
       .catch(() => setServerProviders([]));
   }, []);
+  // AgntUX END
 
   // Local state
   const [ollamaModels, setOllamaModels] = useState<ModelDefinition[]>([]);
@@ -205,7 +207,7 @@ export function useChatSession({
       ollamaModels,
       getAzureBaseUrl,
       customProviders,
-      serverProviders, // AgntUX: pass server-side provider list
+      serverProviders, // AgntUX: server-side provider list
     });
   }, [
     hasToken,
@@ -214,7 +216,7 @@ export function useChatSession({
     ollamaModels,
     getAzureBaseUrl,
     customProviders,
-    serverProviders, // AgntUX
+    serverProviders, // AgntUX: server-side provider list
   ]);
 
   // Model selection with persistence
@@ -334,7 +336,7 @@ export function useChatSession({
   }, [setMessages]);
 
   // Auth headers setup - reset chat after auth changes to ensure transport has correct headers
-  // AgntUX: Skip in self-hosted mode — no WorkOS auth, prevents infinite re-render loop from CORS errors
+  // AgntUX START — Skip in self-hosted mode — no WorkOS auth, prevents infinite re-render loop from CORS errors
   useEffect(() => {
     if (!hasConvex) {
       setAuthHeaders(undefined);
@@ -366,7 +368,7 @@ export function useChatSession({
     return () => {
       active = false;
     };
-  }, [getAccessToken, setMessages, hasConvex]);
+  }, [getAccessToken, setMessages, hasConvex]); // AgntUX END
 
   // Ollama model detection
   useEffect(() => {

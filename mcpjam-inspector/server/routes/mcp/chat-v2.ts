@@ -130,7 +130,7 @@ chatV2.post("/", async (c) => {
     }
 
     // User-provided models: direct streamText
-    // AgntUX: Fall back to server-side API keys when client doesn't provide one.
+    // AgntUX START — Fall back to server-side API keys when client doesn't provide one.
     // This keeps keys secure on the server for self-hosted deployments.
     const serverKeyMap: Record<string, string | undefined> = {
       anthropic: process.env.ANTHROPIC_API_KEY,
@@ -141,6 +141,7 @@ chatV2.post("/", async (c) => {
       xai: process.env.XAI_API_KEY,
     };
     const effectiveApiKey = apiKey || serverKeyMap[modelDefinition.provider] || "";
+    // AgntUX END
     const llmModel = createLlmModel(
       modelDefinition,
       effectiveApiKey,

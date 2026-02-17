@@ -1,14 +1,18 @@
 {
-  "name": "@mcpjam/inspector",
+  "name": "@agntux/mcpjam-inspector",
   "productName": "MCPJam Inspector",
-  "version": "1.5.17",
+  "version": "1.5.17-agntux.1",
   "type": "module",
-  "description": "MCPJam Inspector",
+  "description": "MCPJam Inspector (AgntUX fork with self-hosted mode and visual testing)",
   "license": "Apache-2.0",
-  "author": "MCPJam (https://mcpjam.com)",
-  "homepage": "https://mcpjam.com",
-  "bugs": "https://github.com/mcpjam/inspector/issues",
+  "author": "AgntUX (forked from MCPJam)",
+  "homepage": "https://github.com/agntux/MCPJam-inspector",
+  "bugs": "https://github.com/agntux/MCPJam-inspector/issues",
   "repository": {
+    "type": "git",
+    "url": "https://github.com/agntux/MCPJam-inspector.git"
+  },
+  "upstreamRepository": {
     "type": "git",
     "url": "https://github.com/MCPJam/inspector.git"
   },
@@ -78,7 +82,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:agntux": "npm run build && cd .. && docker build -f Dockerfile.agntux -t agntux/mcpjam-inspector:latest .",
+    "deploy:agntux": "cd .. && fly deploy --dockerfile Dockerfile.agntux"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.36",

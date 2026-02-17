@@ -1,3 +1,14 @@
+> **AgntUX Fork Notice**
+>
+> This is the [AgntUX](https://agntux.ai) fork of MCPJam Inspector, adapted for self-hosted deployment without Convex/WorkOS dependencies. Key additions include server-side API key management, Playwright visual testing, and Fly.io deployment infrastructure.
+>
+> - **Fork docs**: [AGNTUX-FORK.md](AGNTUX-FORK.md) | [UPSTREAM-SYNC.md](UPSTREAM-SYNC.md) | [RELEASING.md](RELEASING.md)
+> - **Contributing**: [CONTRIBUTING-AGNTUX.md](CONTRIBUTING-AGNTUX.md)
+> - **Branch**: `agntux-main` is the production branch. `main` tracks upstream.
+> - **Quick start (self-hosted)**: `AGNTUX_MODE=true npm run dev`
+
+---
+
 <div align="center">
 
 <picture>

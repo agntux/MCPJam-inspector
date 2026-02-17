@@ -82,7 +82,7 @@ function logBox(content: string, title?: string) {
 // Import routes and services
 import mcpRoutes from "./routes/mcp/index";
 import appsRoutes from "./routes/apps/index";
-import configRoutes from "./routes/config"; // AgntUX: server-side provider config
+import configRoutes from "./routes/config"; // AgntUX: server-side provider config endpoint
 import { rpcLogBus } from "./services/rpc-log-bus";
 import { tunnelManager } from "./services/tunnel-manager";
 import {
@@ -212,13 +212,14 @@ if (
 
 dotenv.config({ path: envPath });
 
-// AgntUX: CONVEX_HTTP_URL is optional in self-hosted mode (no MCPJam free-tier models)
+// AgntUX START — CONVEX_HTTP_URL is optional in self-hosted mode (no MCPJam free-tier models)
 if (!process.env.CONVEX_HTTP_URL) {
   appLogger.warn(
     "CONVEX_HTTP_URL is not set. MCPJam free-tier models will be unavailable. " +
     "Set ANTHROPIC_API_KEY / OPENAI_API_KEY for BYO model support.",
   );
 }
+// AgntUX END
 
 // Initialize centralized MCPJam Client Manager and wire RPC logging to SSE bus
 const mcpClientManager = new MCPClientManager(

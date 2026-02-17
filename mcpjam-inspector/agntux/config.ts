@@ -8,14 +8,26 @@
 export interface AgntuxConfig {
   /** Whether AgntUX mode is enabled */
   enabled: boolean;
+  /** Alias for `enabled` — true when running without Convex/WorkOS (self-hosted) */
+  isSelfHostedMode: boolean;
+  /** True when VITE_MCPJAM_HOSTED_MODE is set (managed cloud deployment) */
+  isHostedMode: boolean;
+  /** True when Convex is required (i.e. NOT self-hosted) */
+  convexRequired: boolean;
   /** Allowed hosts for MCP server connections */
   allowedHosts: readonly string[];
   /** Default timeout for Playwright tests (ms) */
   testTimeout: number;
 }
 
+const _enabled = process.env.AGNTUX_MODE === 'true';
+const _isHostedMode = process.env.VITE_MCPJAM_HOSTED_MODE === 'true';
+
 export const agntuxConfig: AgntuxConfig = {
-  enabled: process.env.AGNTUX_MODE === 'true',
+  enabled: _enabled,
+  isSelfHostedMode: _enabled,
+  isHostedMode: _isHostedMode,
+  convexRequired: !_enabled,
   allowedHosts: ['app.agntux.ai', 'agntux.app', 'localhost'],
   testTimeout: 60000,
 };

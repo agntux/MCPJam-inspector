@@ -26,7 +26,7 @@ export function buildAvailableModels(params: {
   ollamaModels: ModelDefinition[];
   getAzureBaseUrl: () => string;
   customProviders: CustomProvider[];
-  serverProviders?: string[]; // AgntUX: providers with server-side API keys
+  serverProviders?: string[]; // AgntUX: providers with server-side API keys (self-hosted mode)
 }): ModelDefinition[] {
   const {
     hasToken,
@@ -38,13 +38,15 @@ export function buildAvailableModels(params: {
     serverProviders = [], // AgntUX
   } = params;
 
+  // AgntUX START — server-side key fallback for self-hosted deployments
   const providerHasKey: Record<string, boolean> = {
-    anthropic: hasToken("anthropic") || serverProviders.includes("anthropic"), // AgntUX: server-side key fallback
-    openai: hasToken("openai") || serverProviders.includes("openai"), // AgntUX
-    deepseek: hasToken("deepseek") || serverProviders.includes("deepseek"), // AgntUX
-    google: hasToken("google") || serverProviders.includes("google"), // AgntUX
-    mistral: hasToken("mistral") || serverProviders.includes("mistral"), // AgntUX
-    xai: hasToken("xai") || serverProviders.includes("xai"), // AgntUX
+    anthropic: hasToken("anthropic") || serverProviders.includes("anthropic"),
+    openai: hasToken("openai") || serverProviders.includes("openai"),
+    deepseek: hasToken("deepseek") || serverProviders.includes("deepseek"),
+    google: hasToken("google") || serverProviders.includes("google"),
+    mistral: hasToken("mistral") || serverProviders.includes("mistral"),
+    xai: hasToken("xai") || serverProviders.includes("xai"),
+    // AgntUX END
     azure: Boolean(getAzureBaseUrl()),
     ollama: isOllamaRunning,
     openrouter: Boolean(
@@ -53,7 +55,7 @@ export function buildAvailableModels(params: {
     meta: false,
   } as const;
 
-  // AgntUX: Hide MCPJam free-tier models when Convex is not configured (self-hosted mode)
+  // AgntUX: Hide MCPJam free-tier models when Convex is not configured (self-hosted)
   const hasConvex = Boolean(import.meta.env.VITE_CONVEX_URL);
   const cloud = SUPPORTED_MODELS.filter((m) => {
     if (isMCPJamProvidedModel(m.id)) return hasConvex;

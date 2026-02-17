@@ -1,6 +1,5 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.jsx";
 import "./index.css";
 import {
   getPostHogKey,
@@ -8,12 +7,14 @@ import {
   isPostHogDisabled,
 } from "./lib/PosthogUtils.js";
 import { PostHogProvider } from "posthog-js/react";
-import { AuthKitProvider, useAuth } from "@workos-inc/authkit-react";
-import { ConvexReactClient, ConvexProviderWithAuth } from "convex/react";
-import { ConvexProviderWithAuthKit } from "@convex-dev/workos";
 import { initSentry } from "./lib/sentry.js";
 import { IframeRouterError } from "./components/IframeRouterError.jsx";
 import { initializeSessionToken } from "./lib/session-token.js";
+// AgntUX: Provider factories extracted for cleaner fork separation
+import {
+  createSelfHostedProviders,
+  createManagedProviders,
+} from "../../agntux/lib/self-hosted-providers";
 
 // Initialize Sentry before React mounts
 initSentry();
@@ -92,72 +93,14 @@ if (isInIframe) {
     };
   })();
 
-  // Build provider tree - use real providers when configured, dummy when not
+  // AgntUX START — Build provider tree using extracted factory functions
   const Providers = (() => {
     if (convexUrl && workosClientId) {
-      const convex = new ConvexReactClient(convexUrl);
-      return (
-        <AuthKitProvider
-          clientId={workosClientId}
-          redirectUri={workosRedirectUri}
-          {...workosClientOptions}
-        >
-          <ConvexProviderWithAuthKit client={convex} useAuth={useAuth}>
-            <App />
-          </ConvexProviderWithAuthKit>
-        </AuthKitProvider>
-      );
+      return createManagedProviders(convexUrl, workosClientId, workosRedirectUri, workosClientOptions);
     }
-    // AgntUX: Self-hosted mode — provide dummy providers without real Convex/WorkOS connections.
-    // Use a no-op WebSocket so the Convex client never makes network requests or retries.
-    // Without this, the client enters a WebSocket reconnection loop that re-renders the
-    // entire React tree and freezes the page.
-    class NoOpWebSocket {
-      static CONNECTING = 0;
-      static OPEN = 1;
-      static CLOSING = 2;
-      static CLOSED = 3;
-      readyState = 0; // CONNECTING — sits here forever, no events fire
-      url: string;
-      onopen: null = null;
-      onclose: null = null;
-      onerror: null = null;
-      onmessage: null = null;
-      constructor(url: string) { this.url = url; }
-      close() { this.readyState = 3; }
-      send() {}
-      addEventListener() {}
-      removeEventListener() {}
-      dispatchEvent() { return false; }
-    }
-    console.log("[AgntUX] Self-hosted mode: using NoOpWebSocket for Convex client");
-    const dummyConvex = new ConvexReactClient("https://127.0.0.1:1", {
-      skipConvexDeploymentUrlCheck: true,
-      webSocketConstructor: NoOpWebSocket as any,
-    });
-    // CRITICAL: useAuth return value must be a STABLE reference (same object every call).
-    // ConvexProviderWithAuth calls useAuth() on every render as a hook. If fetchAccessToken
-    // is a new function reference each time, Convex's internal useEffect dependencies change
-    // on every render, causing an infinite re-render loop that freezes the page.
-    const stableFetchToken = async () => null;
-    const stableAuthState = {
-      isLoading: false,
-      isAuthenticated: true,
-      fetchAccessToken: stableFetchToken,
-    };
-    const selfHostedUseAuth = () => stableAuthState;
-    return (
-      <AuthKitProvider
-        clientId={workosClientId || "hosted_placeholder"}
-        redirectUri={workosRedirectUri}
-        devMode={true}
-      >
-        <ConvexProviderWithAuth client={dummyConvex} useAuth={selfHostedUseAuth}>
-          <App />
-        </ConvexProviderWithAuth>
-      </AuthKitProvider>
-    );
+    return createSelfHostedProviders();
   })();
+  // AgntUX END
 
   // Async bootstrap to initialize session token before rendering
   async function bootstrap() {
