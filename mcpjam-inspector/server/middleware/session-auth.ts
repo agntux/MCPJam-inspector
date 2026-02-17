@@ -30,6 +30,7 @@ const UNPROTECTED_ROUTES = [
   "/api/mcp/health", // Health check - no sensitive data
   "/api/apps/health", // Health check - no sensitive data
   "/api/session-token", // Token endpoint - protected by localhost check instead
+  "/api/config/server-providers", // AgntUX: exposes provider names (not keys) for model selection
 ];
 
 /**

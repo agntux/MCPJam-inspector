@@ -26,6 +26,7 @@ export function buildAvailableModels(params: {
   ollamaModels: ModelDefinition[];
   getAzureBaseUrl: () => string;
   customProviders: CustomProvider[];
+  serverProviders?: string[]; // AgntUX: providers with server-side API keys
 }): ModelDefinition[] {
   const {
     hasToken,
@@ -34,15 +35,16 @@ export function buildAvailableModels(params: {
     isOllamaRunning,
     ollamaModels,
     customProviders,
+    serverProviders = [], // AgntUX
   } = params;
 
   const providerHasKey: Record<string, boolean> = {
-    anthropic: hasToken("anthropic"),
-    openai: hasToken("openai"),
-    deepseek: hasToken("deepseek"),
-    google: hasToken("google"),
-    mistral: hasToken("mistral"),
-    xai: hasToken("xai"),
+    anthropic: hasToken("anthropic") || serverProviders.includes("anthropic"), // AgntUX: server-side key fallback
+    openai: hasToken("openai") || serverProviders.includes("openai"), // AgntUX
+    deepseek: hasToken("deepseek") || serverProviders.includes("deepseek"), // AgntUX
+    google: hasToken("google") || serverProviders.includes("google"), // AgntUX
+    mistral: hasToken("mistral") || serverProviders.includes("mistral"), // AgntUX
+    xai: hasToken("xai") || serverProviders.includes("xai"), // AgntUX
     azure: Boolean(getAzureBaseUrl()),
     ollama: isOllamaRunning,
     openrouter: Boolean(
@@ -51,8 +53,10 @@ export function buildAvailableModels(params: {
     meta: false,
   } as const;
 
+  // AgntUX: Hide MCPJam free-tier models when Convex is not configured (self-hosted mode)
+  const hasConvex = Boolean(import.meta.env.VITE_CONVEX_URL);
   const cloud = SUPPORTED_MODELS.filter((m) => {
-    if (isMCPJamProvidedModel(m.id)) return true;
+    if (isMCPJamProvidedModel(m.id)) return hasConvex;
     return providerHasKey[m.provider];
   });
 
@@ -88,7 +92,10 @@ export const getDefaultModel = (
     "anthropic/claude-haiku-4.5",
     "openai/gpt-5-mini",
     "meta-llama/llama-4-scout",
-    Model.CLAUDE_3_7_SONNET_LATEST, // anthropic
+    Model.CLAUDE_SONNET_4_5, // anthropic (preferred — claude-3-7-sonnet-latest is deprecated)
+    Model.CLAUDE_SONNET_4_0, // anthropic
+    Model.CLAUDE_HAIKU_4_5, // anthropic (cheapest current model)
+    Model.CLAUDE_3_7_SONNET_LATEST, // anthropic (legacy fallback)
     Model.GPT_4_1, // openai
     Model.GEMINI_2_5_PRO, // google
     Model.DEEPSEEK_CHAT, // deepseek
@@ -99,5 +106,6 @@ export const getDefaultModel = (
     const found = availableModels.find((m) => m.id === id);
     if (found) return found;
   }
-  return availableModels[0];
+  // AgntUX: Safe fallback when no models available yet (server providers still loading)
+  return availableModels[0] ?? { id: Model.CLAUDE_SONNET_4_5, name: "Claude Sonnet 4.5", provider: "anthropic" as const };
 };

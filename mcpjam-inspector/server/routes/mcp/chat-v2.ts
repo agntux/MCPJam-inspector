@@ -130,9 +130,20 @@ chatV2.post("/", async (c) => {
     }
 
     // User-provided models: direct streamText
+    // AgntUX: Fall back to server-side API keys when client doesn't provide one.
+    // This keeps keys secure on the server for self-hosted deployments.
+    const serverKeyMap: Record<string, string | undefined> = {
+      anthropic: process.env.ANTHROPIC_API_KEY,
+      openai: process.env.OPENAI_API_KEY,
+      deepseek: process.env.DEEPSEEK_API_KEY,
+      google: process.env.GOOGLE_API_KEY,
+      mistral: process.env.MISTRAL_API_KEY,
+      xai: process.env.XAI_API_KEY,
+    };
+    const effectiveApiKey = apiKey || serverKeyMap[modelDefinition.provider] || "";
     const llmModel = createLlmModel(
       modelDefinition,
-      apiKey ?? "",
+      effectiveApiKey,
       {
         ollama: body.ollamaBaseUrl,
         azure: body.azureBaseUrl,

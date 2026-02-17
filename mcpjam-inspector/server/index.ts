@@ -82,6 +82,7 @@ function logBox(content: string, title?: string) {
 // Import routes and services
 import mcpRoutes from "./routes/mcp/index";
 import appsRoutes from "./routes/apps/index";
+import configRoutes from "./routes/config"; // AgntUX: server-side provider config
 import { rpcLogBus } from "./services/rpc-log-bus";
 import { tunnelManager } from "./services/tunnel-manager";
 import {
@@ -211,10 +212,11 @@ if (
 
 dotenv.config({ path: envPath });
 
-// Validate required env vars
+// AgntUX: CONVEX_HTTP_URL is optional in self-hosted mode (no MCPJam free-tier models)
 if (!process.env.CONVEX_HTTP_URL) {
-  throw new Error(
-    "CONVEX_HTTP_URL is required but not set. Please set it via environment variable or .env file.",
+  appLogger.warn(
+    "CONVEX_HTTP_URL is not set. MCPJam free-tier models will be unavailable. " +
+    "Set ANTHROPIC_API_KEY / OPENAI_API_KEY for BYO model support.",
   );
 }
 
@@ -275,6 +277,7 @@ app.use(
 // API Routes
 app.route("/api/apps", appsRoutes);
 app.route("/api/mcp", mcpRoutes);
+app.route("/api/config", configRoutes); // AgntUX: server-side provider config
 
 // Fallback for clients that post to "/sse/message" instead of the rewritten proxy messages URL.
 // We resolve the upstream messages endpoint via sessionId and forward with any injected auth.
@@ -326,9 +329,17 @@ if (process.env.NODE_ENV === "production") {
   // Serve static assets (JS, CSS, images) - no token injection needed
   app.use("/assets/*", serveStatic({ root: clientRoot }));
 
-  // Serve all static files from client root (images, svgs, etc.)
-  // This handles files like /mcp_jam_light.png, /favicon.ico, etc.
-  app.use("/*", serveStatic({ root: clientRoot }));
+  // Serve static files from client root (images, svgs, etc.)
+  // Exclude index.html so the SPA fallback can inject the session token
+  app.use("/*", async (c, next) => {
+    const path = c.req.path;
+    // Skip root path and paths without extensions - let SPA fallback handle them
+    if (path === "/" || (!path.includes(".") && !path.startsWith("/assets/"))) {
+      return next();
+    }
+    const middleware = serveStatic({ root: clientRoot });
+    return middleware(c, next);
+  });
 
   // SPA fallback - serve index.html with token injection for non-API routes
   app.get("*", async (c) => {

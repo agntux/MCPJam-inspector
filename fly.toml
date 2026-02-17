@@ -15,6 +15,9 @@ primary_region = "iad"
   AGNTUX_MODE = "true"
   PORT = "6274"
   DOCKER_CONTAINER = "true"
+  VITE_MCPJAM_HOSTED_MODE = "true"
+  MCPJAM_ALLOWED_HOSTS = "mcpjam-agntux.fly.dev"
+  ALLOWED_ORIGINS = "https://mcpjam-agntux.fly.dev"
 
 [http_service]
   internal_port = 6274

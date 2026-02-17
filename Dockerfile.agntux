@@ -11,30 +11,32 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g npm@latest
 
-# Create non-root user for security
-RUN groupadd --gid 1000 appuser \
-    && useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
+# The Playwright image already has a user with UID/GID 1000 (pwuser).
+# We reuse it for security (non-root runtime).
 
 WORKDIR /app
 
 # Copy SDK first (it's a dependency)
-COPY --chown=appuser:appuser sdk/package*.json ./sdk/
+COPY --chown=1000:1000 sdk/package*.json ./sdk/
 RUN cd sdk && npm ci --legacy-peer-deps
 
-COPY --chown=appuser:appuser sdk/ ./sdk/
+COPY --chown=1000:1000 sdk/ ./sdk/
 RUN cd sdk && npm run build
 
 # Copy MCPJam Inspector
-COPY --chown=appuser:appuser mcpjam-inspector/package*.json ./mcpjam-inspector/
+COPY --chown=1000:1000 mcpjam-inspector/package*.json ./mcpjam-inspector/
 RUN cd mcpjam-inspector && npm ci --legacy-peer-deps
 
-COPY --chown=appuser:appuser mcpjam-inspector/ ./mcpjam-inspector/
+COPY --chown=1000:1000 mcpjam-inspector/ ./mcpjam-inspector/
+
+# Set VITE_MCPJAM_HOSTED_MODE at build time so the client knows it's in hosted mode
+ENV VITE_MCPJAM_HOSTED_MODE=true
 
 # Build the inspector
 RUN cd mcpjam-inspector && npm run build
 
-# Switch to non-root user
-USER appuser
+# Switch to non-root user (UID 1000 from Playwright image)
+USER 1000
 
 WORKDIR /app/mcpjam-inspector
 
