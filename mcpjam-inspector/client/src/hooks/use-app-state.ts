@@ -49,6 +49,9 @@ import {
 import { MCPServerConfig } from "@mcpjam/sdk";
 import type { OAuthTestProfile } from "@/lib/oauth/profile";
 import { authFetch } from "@/lib/session-token";
+// AgntUX START — Import for ?skillUrl= auto-install feature
+import { installSkillFromUrl } from "@/lib/apis/mcp-skills-api";
+// AgntUX END
 export type { ServerWithName } from "@/state/app-types";
 
 /**
@@ -1301,6 +1304,28 @@ export function useAppState() {
         handleConnect(formData);
         return;
       }
+
+      // AgntUX START — Auto-install skill from ?skillUrl= query parameter
+      const skillUrlParam = urlParams.get("skillUrl");
+      if (skillUrlParam) {
+        logger.info("Auto-installing skill from URL parameter", {
+          skillUrl: skillUrlParam,
+        });
+        installSkillFromUrl(skillUrlParam)
+          .then((skill) => {
+            toast.success(`Skill "${skill.name}" installed`);
+          })
+          .catch((error) => {
+            const msg = error instanceof Error ? error.message : "Unknown error";
+            if (msg.includes("already exists")) {
+              toast.info(msg);
+            } else {
+              toast.error(`Failed to install skill: ${msg}`);
+            }
+          });
+        // Don't return — allow CLI config processing to continue
+      }
+      // AgntUX END
 
       // Fetch CLI config from API (both dev and production)
       authFetch("/api/mcp-cli-config")

@@ -448,6 +448,90 @@ interface AssertionResult {
 
 ---
 
+## Skill Auto-Install via URL (`?skillUrl=`)
+
+### Overview
+
+MCP Jam supports auto-installing skills from a remote URL via the `?skillUrl=` query parameter. This is the skill equivalent of the existing `?mcpServerUrl=` parameter.
+
+When a user navigates to MCP Jam with `?skillUrl=https://...SKILL.md`, the app:
+1. Sends the URL to the server-side proxy endpoint
+2. Server fetches the SKILL.md content (avoiding CORS issues)
+3. Parses and validates the skill file
+4. Installs it to `~/.mcpjam/skills/<name>/SKILL.md`
+5. Shows a toast notification on success or if already installed
+
+### Usage
+
+```
+http://localhost:5173/?skillUrl=https://static.agntux.app/skills/<appId>/<timestamp>/SKILL.md#app-builder
+```
+
+The `#app-builder` hash fragment navigates to the App Builder tab via existing hash-based routing.
+
+### API Endpoint
+
+#### `POST /api/mcp/skills/install-from-url`
+
+Server-side proxy that fetches and installs a SKILL.md from a remote URL.
+
+**Request Body:**
+```json
+{
+  "url": "https://static.agntux.app/skills/example/SKILL.md"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "skill": {
+    "name": "example-skill",
+    "description": "An example skill",
+    "content": "...",
+    "path": "~/.mcpjam/skills/example-skill"
+  }
+}
+```
+
+**Already Exists (409):**
+```json
+{
+  "success": false,
+  "error": "Skill 'example-skill' already exists",
+  "skill": { }
+}
+```
+
+**Fetch Failed (502):**
+```json
+{
+  "success": false,
+  "error": "Failed to fetch skill from URL: <details>"
+}
+```
+
+### Modified Files
+
+All changes are wrapped in `// AgntUX START` / `// AgntUX END` markers:
+
+- `server/routes/mcp/skills.ts` — New `/install-from-url` endpoint
+- `client/src/lib/apis/mcp-skills-api.ts` — New `installSkillFromUrl()` function
+- `client/src/hooks/use-app-state.ts` — `?skillUrl=` query parameter handling in mount useEffect
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Server vs client fetch | Server-side proxy | Avoids S3 CORS issues |
+| HTTPS only | Yes | Security — S3 URLs are always HTTPS |
+| Already exists (409) | `toast.info()` | Non-error — skill is available |
+| URL param cleanup | No | Consistent with `mcpServerUrl` behavior |
+| Blocking behavior | Non-blocking | Does not `return` early, allows CLI config to also process |
+
+---
+
 ## Deployment
 
 ### Docker Deployment

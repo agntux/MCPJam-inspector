@@ -648,4 +648,137 @@ skills.post("/read-file", async (c) => {
   }
 });
 
+// AgntUX START
+/**
+ * Install a skill from a remote URL (fetches SKILL.md content server-side)
+ */
+skills.post("/install-from-url", async (c) => {
+  try {
+    const { url } = (await c.req.json()) as { url?: string };
+
+    if (!url) {
+      return c.json({ success: false, error: "url is required" }, 400);
+    }
+
+    // Validate URL format (must be HTTPS)
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return c.json({ success: false, error: "Invalid URL format" }, 400);
+    }
+
+    if (parsedUrl.protocol !== "https:") {
+      return c.json(
+        { success: false, error: "URL must use HTTPS protocol" },
+        400,
+      );
+    }
+
+    // Fetch SKILL.md content from the remote URL
+    let skillMdContent: string;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        return c.json(
+          {
+            success: false,
+            error: `Failed to fetch URL: ${response.status} ${response.statusText}`,
+          },
+          502,
+        );
+      }
+      skillMdContent = await response.text();
+    } catch (fetchError) {
+      return c.json(
+        {
+          success: false,
+          error:
+            fetchError instanceof Error
+              ? `Failed to fetch URL: ${fetchError.message}`
+              : "Failed to fetch URL",
+        },
+        502,
+      );
+    }
+
+    // Parse the SKILL.md content
+    const parsedSkill = parseSkillFile(skillMdContent, "remote");
+    if (!parsedSkill) {
+      return c.json(
+        {
+          success: false,
+          error:
+            "Invalid SKILL.md format. Must contain valid frontmatter with 'name' and 'description' fields.",
+        },
+        400,
+      );
+    }
+
+    const { name, description, content } = parsedSkill;
+
+    // Check for duplicates across all skills directories
+    const skillsDirs = getSkillsDirs();
+    for (const dir of skillsDirs) {
+      if (await directoryExists(dir)) {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const skillFilePath = path.join(dir, entry.name, "SKILL.md");
+          try {
+            const fileContent = await fs.readFile(skillFilePath, "utf-8");
+            const existingSkill = parseSkillFile(fileContent, entry.name);
+            if (existingSkill && existingSkill.name === name) {
+              const skill: Skill = {
+                name: existingSkill.name,
+                description: existingSkill.description,
+                content: existingSkill.content,
+                path: formatDisplayPath(path.join(dir, entry.name)),
+              };
+              return c.json(
+                {
+                  success: false,
+                  error: `Skill '${name}' already exists`,
+                  skill,
+                },
+                409,
+              );
+            }
+          } catch {
+            // Continue
+          }
+        }
+      }
+    }
+
+    // Write raw SKILL.md to primary skills directory
+    const skillsDir = getPrimarySkillsDir();
+    const skillDir = path.join(skillsDir, name);
+    const skillFilePath = path.join(skillDir, "SKILL.md");
+
+    await fs.mkdir(skillsDir, { recursive: true });
+    await fs.mkdir(skillDir, { recursive: true });
+    await fs.writeFile(skillFilePath, skillMdContent, "utf-8");
+
+    const skill: Skill = {
+      name,
+      description,
+      content,
+      path: `~/.mcpjam/skills/${name}`,
+    };
+
+    return c.json({ success: true, skill });
+  } catch (error) {
+    logger.error("Error installing skill from URL", error);
+    return c.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      500,
+    );
+  }
+});
+// AgntUX END
+
 export default skills;

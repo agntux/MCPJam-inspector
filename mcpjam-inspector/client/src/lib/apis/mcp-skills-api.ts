@@ -92,6 +92,21 @@ export async function uploadSkill(data: {
   return body.skill as Skill;
 }
 
+// AgntUX START — Install skill from remote URL (used by ?skillUrl= query parameter)
+export async function installSkillFromUrl(url: string): Promise<Skill> {
+  const res = await authFetch("/api/mcp/skills/install-from-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(body?.error || `Failed to install skill (${res.status})`);
+  }
+  return body.skill as Skill;
+}
+// AgntUX END
+
 /**
  * Upload a skill folder with multiple files
  */
