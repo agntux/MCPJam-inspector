@@ -194,8 +194,9 @@ const envFile =
 
 // Determine where to look for .env file:
 // 1. Electron: Resources folder
-// 2. npm package: package root (two levels up from dist/server)
-// 3. Local dev: current working directory
+// 2. Dev mode: one level up from server/ (project root)
+// 3. npm package / production: two levels up from dist/server/
+// 4. Fallback: current working directory (relative envFile name)
 let envPath = envFile;
 if (
   process.env.ELECTRON_APP === "true" &&
@@ -203,10 +204,15 @@ if (
 ) {
   envPath = join(process.env.ELECTRON_RESOURCES_PATH, envFile);
 } else {
-  const packageRoot = resolve(__dirname, "..", "..");
-  const packageEnvPath = join(packageRoot, envFile);
-  if (existsSync(packageEnvPath)) {
-    envPath = packageEnvPath;
+  // Try one level up first (dev: server/ → project root),
+  // then two levels (production: dist/server/ → project root).
+  const candidates = [
+    join(resolve(__dirname, ".."), envFile),
+    join(resolve(__dirname, "..", ".."), envFile),
+  ];
+  const found = candidates.find((p) => existsSync(p));
+  if (found) {
+    envPath = found;
   }
 }
 
