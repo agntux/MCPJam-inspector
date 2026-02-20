@@ -2,10 +2,24 @@
 >
 > This is the [AgntUX](https://agntux.ai) fork of MCPJam Inspector, adapted for self-hosted deployment without Convex/WorkOS dependencies. Key additions include server-side API key management, Playwright visual testing, and Fly.io deployment infrastructure.
 >
+> AgntUX uses this inspector as the primary testing tool for Agent Skills and MCP Apps built by the AI Workflow Architect platform. It sits alongside two other repos in the AgntUX ecosystem: `agntux/app` (the Next.js hosting platform) and `agntux/langgraph` (the AI engine that builds Agent Skills).
+>
 > - **Fork docs**: [AGNTUX-FORK.md](AGNTUX-FORK.md) | [UPSTREAM-SYNC.md](UPSTREAM-SYNC.md) | [RELEASING.md](RELEASING.md)
 > - **Contributing**: [CONTRIBUTING-AGNTUX.md](CONTRIBUTING-AGNTUX.md)
 > - **Branch**: `agntux-main` is the production branch. `main` tracks upstream.
 > - **Quick start (self-hosted)**: `AGNTUX_MODE=true npm run dev`
+
+## AgntUX Usage
+
+This fork is the testing layer for the AgntUX platform. Specific use cases:
+
+- **Test Agent Skills** — connect to MCP servers hosted at `/:id/mcp` endpoints on `agntux/app` and validate tool calls, resource access, and prompt flows
+- **Debug MCP App UIs** — use the Apps Builder to visually inspect and iterate on MCP App widgets before publishing an Agent Skill
+- **Validate Relay Pattern flows** — verify that the host fetches data via third-party connectors, passes it correctly to the MCP App, and writes results back without exposing third-party API keys
+- **Playwright visual testing** — run automated visual regression tests against MCP App widgets in Docker (see `mcpjam-inspector/agntux/` and `Dockerfile.agntux`)
+- **Self-hosted mode** — run with `AGNTUX_MODE=true` so no Convex or WorkOS account is needed; provider API keys stay server-side
+
+For setup and architecture details, see [CLAUDE.md](CLAUDE.md) and [AGNTUX-FORK.md](AGNTUX-FORK.md).
 
 ---
 
