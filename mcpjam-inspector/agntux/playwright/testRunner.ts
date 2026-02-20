@@ -95,6 +95,7 @@ async function runScenario(
   page: Page,
   scenario: TestScenario,
   mcpServerUrl: string,
+  mockServerUrls?: string[],
 ): Promise<ScenarioResult> {
   const startTime = Date.now();
   const result: ScenarioResult = {
@@ -127,8 +128,15 @@ async function runScenario(
   page.on('console', consoleHandler);
 
   try {
-    // Navigate to MCPJam Inspector with the MCP server
-    const inspectorUrl = `http://localhost:6274?mcpServer=${encodeURIComponent(mcpServerUrl)}`;
+    // Navigate to MCPJam Inspector with the MCP server(s)
+    const urlParams = new URLSearchParams();
+    urlParams.append('mcpServerUrl', mcpServerUrl);
+    if (mockServerUrls) {
+      for (const mockUrl of mockServerUrls) {
+        urlParams.append('mcpServerUrl', mockUrl);
+      }
+    }
+    const inspectorUrl = `http://localhost:6274?${urlParams.toString()}`;
     await page.goto(inspectorUrl, { waitUntil: 'networkidle' });
 
     // Wait for the app to be ready
@@ -305,6 +313,7 @@ async function runScenario(
 export async function runPlaywrightTests(
   mcpServerUrl: string,
   scenarios: TestScenario[],
+  mockServerUrls?: string[],
 ): Promise<TestResults> {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
@@ -324,7 +333,7 @@ export async function runPlaywrightTests(
     for (const scenario of scenarios) {
       const page = await context.newPage();
       try {
-        const result = await runScenario(page, scenario, mcpServerUrl);
+        const result = await runScenario(page, scenario, mcpServerUrl, mockServerUrls);
         results.push(result);
       } finally {
         await page.close();

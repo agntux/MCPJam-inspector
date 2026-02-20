@@ -1288,20 +1288,23 @@ export function useAppState() {
   useEffect(() => {
     if (!isLoading && !cliConfigProcessedRef.current) {
       cliConfigProcessedRef.current = true;
-      // Check for mcpServerUrl query parameter (used by AgntUX "Test in MCP Jam" button)
+      // Check for mcpServerUrl query parameter(s) (used by AgntUX "Test in MCP Jam" button)
       const urlParams = new URLSearchParams(window.location.search);
-      const mcpServerUrlParam = urlParams.get("mcpServerUrl");
-      if (mcpServerUrlParam) {
-        logger.info("Auto-connecting to MCP server from URL parameter", {
-          mcpServerUrl: mcpServerUrlParam,
+      const mcpServerUrlParams = urlParams.getAll("mcpServerUrl");
+      if (mcpServerUrlParams.length > 0) {
+        logger.info("Auto-connecting to MCP server(s) from URL parameter", {
+          mcpServerUrls: mcpServerUrlParams,
         });
-        const formData: ServerFormData = {
-          name: "AgntUX Component",
-          type: "http" as const,
-          url: mcpServerUrlParam,
-          env: {},
-        };
-        handleConnect(formData);
+        const uniqueUrls = [...new Set(mcpServerUrlParams)];
+        for (let i = 0; i < uniqueUrls.length; i++) {
+          const formData: ServerFormData = {
+            name: `Server ${i + 1}`,
+            type: "http" as const,
+            url: uniqueUrls[i],
+            env: {},
+          };
+          handleConnect(formData);
+        }
         return;
       }
 

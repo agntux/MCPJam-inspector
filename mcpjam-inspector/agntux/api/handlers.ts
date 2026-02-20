@@ -12,6 +12,7 @@ import { runPlaywrightTests } from '../playwright/testRunner.js';
 interface TestRequestBody {
   mcpServerUrl: string;
   scenarios: TestScenario[];
+  mockServerUrls?: string[];
 }
 
 /**
@@ -45,7 +46,7 @@ export async function healthHandler(c: Context): Promise<Response> {
 export async function testHandler(c: Context): Promise<Response> {
   try {
     const body = (await c.req.json()) as Partial<TestRequestBody>;
-    const { mcpServerUrl, scenarios } = body;
+    const { mcpServerUrl, scenarios, mockServerUrls } = body;
 
     if (!mcpServerUrl || !scenarios || !Array.isArray(scenarios)) {
       return c.json(
@@ -67,7 +68,22 @@ export async function testHandler(c: Context): Promise<Response> {
       );
     }
 
-    const results = await runPlaywrightTests(mcpServerUrl, scenarios);
+    // Validate mock server URLs if provided
+    if (mockServerUrls) {
+      for (const mockUrl of mockServerUrls) {
+        if (!isValidUrl(mockUrl)) {
+          return c.json(
+            {
+              success: false,
+              error: `Invalid mockServerUrl: ${mockUrl} must be a valid HTTP or HTTPS URL`,
+            },
+            400
+          );
+        }
+      }
+    }
+
+    const results = await runPlaywrightTests(mcpServerUrl, scenarios, mockServerUrls);
     return c.json(results);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
