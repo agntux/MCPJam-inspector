@@ -20,7 +20,7 @@ This repo is one of three in the AgntUX platform:
 
 ### Key Terms
 
-- **Agent Skill** — the packaged product users create (the deliverable)
+- **Agent Skill** — the packaged product users create — an MCP App bundled with a SKILL.md orchestration file
 - **MCP App** — the runtime format an Agent Skill runs as
 - **Relay Pattern** — the data flow architecture: the AI host fetches data via third-party connectors, passes it to the AgntUX MCP App for UI rendering, the user interacts with the UI, and the host writes results back. AgntUX never touches the user's third-party API keys.
 
