@@ -210,12 +210,13 @@ export function PlaygroundMain({
   }, [storeDeviceType, customViewport]);
 
   const { servers } = useSharedAppState();
+  // AgntUX: Use all connected servers so the chat AI can access tools/resources from every server
   const selectedServers = useMemo(
     () =>
-      serverName && servers[serverName]?.connectionStatus === "connected"
-        ? [serverName]
-        : [],
-    [serverName, servers],
+      Object.entries(servers)
+        .filter(([, s]) => s.connectionStatus === "connected")
+        .map(([name]) => name),
+    [servers],
   );
 
   // Use shared chat session hook
@@ -499,7 +500,10 @@ export function PlaygroundMain({
     selectedServers,
     mcpToolsTokenCount: null,
     mcpToolsTokenCountLoading: false,
-    connectedOrConnectingServerConfigs: { [serverName]: { name: serverName } },
+    // AgntUX: Pass all connected servers (not just one) to chat session
+    connectedOrConnectingServerConfigs: Object.fromEntries(
+      selectedServers.map((name) => [name, { name }]),
+    ),
     systemPromptTokenCount: null,
     systemPromptTokenCountLoading: false,
     mcpPromptResults,

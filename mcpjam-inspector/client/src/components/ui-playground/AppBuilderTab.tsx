@@ -22,6 +22,8 @@ import SaveRequestDialog from "../tools/SaveRequestDialog";
 import { useUIPlaygroundStore } from "@/stores/ui-playground-store";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { listTools } from "@/lib/apis/mcp-tools-api";
+// AgntUX: Import shared app state to access all connected servers
+import { useSharedAppState } from "@/state/app-state-context";
 import { generateFormFieldsFromSchema } from "@/lib/tool-form";
 import type { MCPServerConfig } from "@mcpjam/sdk";
 import { detectEnvironment, detectPlatform } from "@/lib/PosthogUtils";
@@ -135,35 +137,50 @@ export function AppBuilderTab({
     setFormFields,
   });
 
-  // Fetch tools when server changes
+  // AgntUX: Fetch tools from all connected servers (Relay Pattern needs tools from mock + resources from mcp_app)
+  const { servers } = useSharedAppState();
+  const connectedServerNames = useMemo(
+    () =>
+      Object.entries(servers)
+        .filter(([, s]) => s.connectionStatus === "connected")
+        .map(([name]) => name),
+    [servers],
+  );
+
+  // Fetch tools when servers change
   const fetchTools = useCallback(async () => {
-    if (!serverName) return;
+    if (connectedServerNames.length === 0) return;
 
     reset();
     setToolsMetadata({});
     try {
-      const data = await listTools({ serverId: serverName });
-      const toolArray = data.tools ?? [];
-      const dictionary = Object.fromEntries(
-        toolArray.map((tool: Tool) => [tool.name, tool]),
-      );
-      setTools(dictionary);
-      setToolsMetadata(data.toolsMetadata ?? {});
+      const allTools: Record<string, Tool> = {};
+      let allMetadata: Record<string, Record<string, unknown>> = {};
+      for (const sName of connectedServerNames) {
+        const data = await listTools({ serverId: sName });
+        const toolArray = data.tools ?? [];
+        for (const tool of toolArray) {
+          allTools[tool.name] = tool;
+        }
+        allMetadata = { ...allMetadata, ...(data.toolsMetadata ?? {}) };
+      }
+      setTools(allTools);
+      setToolsMetadata(allMetadata);
     } catch (err) {
       console.error("Failed to fetch tools:", err);
       setExecutionError(
         err instanceof Error ? err.message : "Failed to fetch tools",
       );
     }
-  }, [serverName, reset, setTools, setExecutionError]);
+  }, [connectedServerNames, reset, setTools, setExecutionError]);
 
   useEffect(() => {
-    if (serverConfig && serverName) {
+    if (connectedServerNames.length > 0) {
       fetchTools();
     } else {
       reset();
     }
-  }, [serverConfig, serverName, fetchTools, reset]);
+  }, [connectedServerNames, fetchTools, reset]);
 
   // Update form fields when tool is selected
   useEffect(() => {
@@ -210,8 +227,8 @@ export function AppBuilderTab({
     ? PANEL_SIZES.CENTER.DEFAULT_WITH_PANELS
     : PANEL_SIZES.CENTER.DEFAULT_WITHOUT_PANELS;
 
-  // No server selected
-  if (!serverConfig) {
+  // AgntUX: Check for any connected server, not just the selected one
+  if (!serverConfig && connectedServerNames.length === 0) {
     return (
       <EmptyState
         icon={Wrench}

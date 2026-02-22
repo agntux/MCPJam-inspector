@@ -137,6 +137,8 @@ When `AGNTUX_MODE=true`:
 | `mcpjam-inspector/client/src/main.tsx` | `NoOpWebSocket` for dummy Convex client |
 | `mcpjam-inspector/client/src/hooks/use-chat-session.ts` | `hasConvex` checks, `serverProviders` state, skip WorkOS auth |
 | `mcpjam-inspector/client/src/components/chat-v2/shared/model-helpers.ts` | `serverProviders` param, `hasConvex` filter |
+| `mcpjam-inspector/client/src/components/ui-playground/PlaygroundMain.tsx` | Multi-server support: pass all connected servers to chat session |
+| `mcpjam-inspector/client/src/hooks/use-app-state.ts` | `mcpServerName` URL param support for human-readable server names |
 
 ### Added Files
 

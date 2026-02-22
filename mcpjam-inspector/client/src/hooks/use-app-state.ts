@@ -1291,24 +1291,9 @@ export function useAppState() {
       // Check for mcpServerUrl query parameter(s) (used by AgntUX "Test in MCP Jam" button)
       const urlParams = new URLSearchParams(window.location.search);
       const mcpServerUrlParams = urlParams.getAll("mcpServerUrl");
-      if (mcpServerUrlParams.length > 0) {
-        logger.info("Auto-connecting to MCP server(s) from URL parameter", {
-          mcpServerUrls: mcpServerUrlParams,
-        });
-        const uniqueUrls = [...new Set(mcpServerUrlParams)];
-        for (let i = 0; i < uniqueUrls.length; i++) {
-          const formData: ServerFormData = {
-            name: `Server ${i + 1}`,
-            type: "http" as const,
-            url: uniqueUrls[i],
-            env: {},
-          };
-          handleConnect(formData);
-        }
-        return;
-      }
 
       // AgntUX START — Auto-install skill from ?skillUrl= query parameter
+      // Process skillUrl before the mcpServerUrl early-return so both work together
       const skillUrlParam = urlParams.get("skillUrl");
       if (skillUrlParam) {
         logger.info("Auto-installing skill from URL parameter", {
@@ -1317,11 +1302,23 @@ export function useAppState() {
         installSkillFromUrl(skillUrlParam)
           .then((skill) => {
             toast.success(`Skill "${skill.name}" installed`);
+            // AgntUX: Notify SkillsTab to refresh and select the newly installed skill
+            window.dispatchEvent(
+              new CustomEvent("skill-installed", {
+                detail: { name: skill.name },
+              }),
+            );
           })
           .catch((error) => {
             const msg = error instanceof Error ? error.message : "Unknown error";
             if (msg.includes("already exists")) {
               toast.info(msg);
+              // AgntUX: Still notify SkillsTab to select the existing skill
+              window.dispatchEvent(
+                new CustomEvent("skill-installed", {
+                  detail: { name: msg.match(/Skill '(.+)' already exists/)?.[1] },
+                }),
+              );
             } else {
               toast.error(`Failed to install skill: ${msg}`);
             }
@@ -1329,6 +1326,25 @@ export function useAppState() {
         // Don't return — allow CLI config processing to continue
       }
       // AgntUX END
+
+      if (mcpServerUrlParams.length > 0) {
+        // AgntUX: Support mcpServerName URL params for human-readable server names
+        const mcpServerNameParams = urlParams.getAll("mcpServerName");
+        logger.info("Auto-connecting to MCP server(s) from URL parameter", {
+          mcpServerUrls: mcpServerUrlParams,
+        });
+        const uniqueUrls = [...new Set(mcpServerUrlParams)];
+        for (let i = 0; i < uniqueUrls.length; i++) {
+          const formData: ServerFormData = {
+            name: mcpServerNameParams[i] || `Server ${i + 1}`,
+            type: "http" as const,
+            url: uniqueUrls[i],
+            env: {},
+          };
+          handleConnect(formData);
+        }
+        return;
+      }
 
       // Fetch CLI config from API (both dev and production)
       authFetch("/api/mcp-cli-config")

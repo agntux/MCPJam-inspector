@@ -84,6 +84,21 @@ export function SkillsTab() {
     fetchSkills();
   }, []);
 
+  // AgntUX: Re-fetch skills when a new skill is installed via ?skillUrl= param
+  useEffect(() => {
+    const handleSkillInstalled = (e: Event) => {
+      const name = (e as CustomEvent<{ name?: string }>).detail?.name;
+      fetchSkills().then(() => {
+        if (name) {
+          setSelectedSkillName(name);
+        }
+      });
+    };
+    window.addEventListener("skill-installed", handleSkillInstalled);
+    return () =>
+      window.removeEventListener("skill-installed", handleSkillInstalled);
+  }, []);
+
   useEffect(() => {
     if (selectedSkillName) {
       fetchSkillContent(selectedSkillName);
