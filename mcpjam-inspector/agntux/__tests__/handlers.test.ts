@@ -198,10 +198,104 @@ describe('testHandler', () => {
 
       expect(res.status).toBe(200);
     });
+
+    it('returns 400 when a mockServerUrl is not a valid URL', async () => {
+      const res = await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mcpServerUrl: 'http://localhost:3000',
+          scenarios: [],
+          mockServerUrls: ['not-a-valid-url'],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toContain('Invalid mockServerUrl');
+      expect(json.error).toContain('not-a-valid-url');
+    });
+
+    it('returns 400 when a mockServerUrl has invalid protocol', async () => {
+      const res = await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mcpServerUrl: 'http://localhost:3000',
+          scenarios: [],
+          mockServerUrls: ['ftp://mock.example.com'],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toContain('Invalid mockServerUrl');
+    });
+
+    it('returns 400 when second mockServerUrl in array is invalid', async () => {
+      const res = await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mcpServerUrl: 'http://localhost:3000',
+          scenarios: [],
+          mockServerUrls: ['http://valid.example.com', 'not-valid'],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toContain('Invalid mockServerUrl');
+      expect(json.error).toContain('not-valid');
+    });
+
+    it('accepts valid mockServerUrls array', async () => {
+      const mockResults = {
+        success: true,
+        scenarios: [],
+        summary: { total: 0, passed: 0, failed: 0 },
+      };
+      vi.mocked(runPlaywrightTests).mockResolvedValue(mockResults);
+
+      const res = await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mcpServerUrl: 'http://localhost:3000',
+          scenarios: [],
+          mockServerUrls: ['http://mock1.example.com', 'https://mock2.example.com'],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+    });
+
+    it('accepts request without mockServerUrls field', async () => {
+      const mockResults = {
+        success: true,
+        scenarios: [],
+        summary: { total: 0, passed: 0, failed: 0 },
+      };
+      vi.mocked(runPlaywrightTests).mockResolvedValue(mockResults);
+
+      const res = await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mcpServerUrl: 'http://localhost:3000',
+          scenarios: [],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+    });
   });
 
   describe('successful execution', () => {
-    it('calls runPlaywrightTests with correct parameters', async () => {
+    it('calls runPlaywrightTests with correct parameters (no mockServerUrls)', async () => {
       const mockResults = {
         success: true,
         scenarios: [],
@@ -218,7 +312,29 @@ describe('testHandler', () => {
         body: JSON.stringify({ mcpServerUrl, scenarios }),
       });
 
-      expect(runPlaywrightTests).toHaveBeenCalledWith(mcpServerUrl, scenarios);
+      expect(runPlaywrightTests).toHaveBeenCalledWith(mcpServerUrl, scenarios, undefined);
+      expect(runPlaywrightTests).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls runPlaywrightTests with mockServerUrls when provided', async () => {
+      const mockResults = {
+        success: true,
+        scenarios: [],
+        summary: { total: 0, passed: 0, failed: 0 },
+      };
+      vi.mocked(runPlaywrightTests).mockResolvedValue(mockResults);
+
+      const mcpServerUrl = 'http://localhost:3000';
+      const scenarios = [{ name: 'test-scenario' }];
+      const mockServerUrls = ['http://mock1.example.com', 'https://mock2.example.com'];
+
+      await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mcpServerUrl, scenarios, mockServerUrls }),
+      });
+
+      expect(runPlaywrightTests).toHaveBeenCalledWith(mcpServerUrl, scenarios, mockServerUrls);
       expect(runPlaywrightTests).toHaveBeenCalledTimes(1);
     });
 
