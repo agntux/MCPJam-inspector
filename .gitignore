@@ -2,3 +2,7 @@
 node_modules/
 .mcpjam/skills/
 **/.mcpjam/skills/
+.env*
+.omc/
+**/.omc/
+**/test-results/
