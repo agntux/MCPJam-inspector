@@ -110,7 +110,7 @@ export default defineConfig({
   },
   build: {
     outDir: path.resolve(rootDir, "dist/client"),
-    sourcemap: true,
+    sourcemap: process.env.NODE_ENV !== "production",
     emptyOutDir: true,
   },
   define: {

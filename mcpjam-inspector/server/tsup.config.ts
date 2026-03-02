@@ -13,7 +13,7 @@ export default defineConfig({
   clean: true,
   bundle: true,
   minify: false,
-  sourcemap: true,
+  sourcemap: process.env.NODE_ENV !== "production",
   external: [
     // External packages that should not be bundled
     "@hono/node-server",

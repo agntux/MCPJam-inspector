@@ -5,7 +5,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "heroku-postbuild": "cd sdk && npm install --legacy-peer-deps --include=dev && npm run build && cd ../mcpjam-inspector && npm install --legacy-peer-deps --include=dev && npm run build",
+    "heroku-postbuild": "cd sdk && npm install --legacy-peer-deps --include=dev && npm run build && cd ../mcpjam-inspector && npm install --legacy-peer-deps --include=dev && npm run build && npm prune --legacy-peer-deps --omit=dev && cd ../sdk && npm prune --legacy-peer-deps --omit=dev",
     "start": "cd mcpjam-inspector && node dist/server/index.js"
   }
 }
