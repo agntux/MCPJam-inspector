@@ -408,7 +408,7 @@ describe("PlaygroundMain", () => {
       render(<PlaygroundMain {...defaultProps} />);
 
       expect(
-        screen.getByText("Test ChatGPT Apps and MCP Apps"),
+        screen.getByText("Test your AgntUX Workflow"),
       ).toBeInTheDocument();
     });
 

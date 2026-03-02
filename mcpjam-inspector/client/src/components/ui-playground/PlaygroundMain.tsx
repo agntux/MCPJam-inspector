@@ -554,9 +554,17 @@ export function PlaygroundMain({
             ) : shouldShowUpsell ? (
               <MCPJamFreeModelsPrompt onSignUp={handleSignUp} />
             ) : (
-              <h3 className="text-sm font-semibold text-foreground mb-2">
-                Test ChatGPT Apps and MCP Apps
-              </h3>
+              // AgntUX: replaced upstream heading with AgntUX workflow testing guidance
+              <>
+                <h3 className="text-sm font-semibold text-foreground mb-2">
+                  Test your AgntUX Workflow
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Paste your golden prompts below to test the workflow with dummy
+                  data. If you encounter any problems, go back to AgntUX and
+                  tell the agent what problems you're having.
+                </p>
+              </>
             )}
           </div>
         </div>
