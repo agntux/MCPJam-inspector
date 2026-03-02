@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import "../../types/hono"; // Type extensions
 import { logger } from "../../utils/logger";
+// AgntUX: shared helper for graceful degradation when servers lack prompts support
+import { isMethodUnavailableError } from "../../../agntux/lib/mcp-errors";
 
 const prompts = new Hono();
 
@@ -17,6 +19,10 @@ prompts.post("/list", async (c) => {
     const { prompts } = await mcpClientManager.listPrompts(serverId);
     return c.json({ prompts });
   } catch (error) {
+    // AgntUX: gracefully handle servers that don't support prompts/list
+    if (isMethodUnavailableError(error)) {
+      return c.json({ prompts: [] });
+    }
     logger.error("Error fetching prompts", error, { serverId: "unknown" });
     return c.json(
       {
@@ -52,15 +58,22 @@ prompts.post("/list-multi", async (c) => {
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error";
-          // Only log unexpected errors (not "Unknown MCP server" which is expected during startup race conditions)
-          if (!errorMessage.includes("Unknown MCP server")) {
+          // Only log unexpected errors (not "Unknown MCP server" race conditions or
+          // AgntUX: "unknown method" from servers that don't support prompts)
+          if (
+            !errorMessage.includes("Unknown MCP server") &&
+            !isMethodUnavailableError(error)
+          ) {
             logger.error(
               `Error fetching prompts for server ${serverId}`,
               error,
               { serverId },
             );
           }
-          errors[serverId] = errorMessage;
+          // AgntUX: don't report "method unavailable" as an error to the client
+          if (!isMethodUnavailableError(error)) {
+            errors[serverId] = errorMessage;
+          }
           promptsByServer[serverId] = [];
         }
       }),

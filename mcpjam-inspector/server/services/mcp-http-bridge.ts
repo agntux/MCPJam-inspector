@@ -1,5 +1,7 @@
 import { MCPClientManager } from "@mcpjam/sdk";
 import { z } from "zod";
+// AgntUX: shared helper for graceful degradation when servers lack prompts support
+import { isMethodUnavailableError } from "../../agntux/lib/mcp-errors";
 
 // Unify JSON-RPC handling used by adapter-http and manager-http routes
 // while preserving their minor response-shape differences.
@@ -186,13 +188,21 @@ export async function handleJsonRpc(
         }
       }
       case "prompts/list": {
-        const list = await clientManager.listPrompts(serverId);
-        const prompts = (list?.prompts ?? []).map((p: any) => ({
-          name: p.name,
-          description: p.description,
-          arguments: p.arguments,
-        }));
-        return respond({ result: { prompts } });
+        // AgntUX: gracefully handle servers that don't support prompts/list
+        try {
+          const list = await clientManager.listPrompts(serverId);
+          const prompts = (list?.prompts ?? []).map((p: any) => ({
+            name: p.name,
+            description: p.description,
+            arguments: p.arguments,
+          }));
+          return respond({ result: { prompts } });
+        } catch (e: any) {
+          if (isMethodUnavailableError(e)) {
+            return respond({ result: { prompts: [] } });
+          }
+          throw e;
+        }
       }
       case "prompts/get": {
         try {
