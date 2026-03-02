@@ -1,0 +1,11 @@
+{
+  "name": "agntux-mcpjam-inspector",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "heroku-postbuild": "cd sdk && npm install --legacy-peer-deps && npm run build && cd ../mcpjam-inspector && npm install --legacy-peer-deps && npm run build",
+    "start": "cd mcpjam-inspector && node dist/server/index.js"
+  }
+}
