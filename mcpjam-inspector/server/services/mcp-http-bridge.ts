@@ -14,31 +14,48 @@ type JsonRpcBody = {
   params?: any;
 };
 
-export function buildInitializeResult(serverId: string, mode: BridgeMode) {
+// AgntUX: accept optional upstream capabilities so the bridge only advertises
+// features the upstream server actually supports (prevents prompts/list noise).
+export function buildInitializeResult(
+  serverId: string,
+  mode: BridgeMode,
+  upstreamCapabilities?: Record<string, unknown>,
+) {
+  // AgntUX: only advertise prompts if the upstream server supports them
+  const hasPrompts = upstreamCapabilities
+    ? Boolean(upstreamCapabilities.prompts)
+    : true; // default to true when capabilities are unknown
+
   if (mode === "adapter") {
+    const capabilities: Record<string, unknown> = {
+      tools: { listChanged: true },
+      resources: { listChanged: true, subscribe: true },
+      logging: {},
+      roots: { listChanged: true },
+    };
+    if (hasPrompts) {
+      capabilities.prompts = {};
+    }
     return {
       protocolVersion: "2025-06-18",
-      capabilities: {
-        tools: { listChanged: true },
-        prompts: {},
-        resources: { listChanged: true, subscribe: true },
-        logging: {},
-        roots: { listChanged: true },
-      },
+      capabilities,
       serverInfo: { name: serverId, version: "stdio-adapter" },
     };
   }
   // manager mode (SSE transport facade)
+  const capabilities: Record<string, unknown> = {
+    tools: true,
+    resources: true,
+    logging: false,
+    elicitation: {},
+    roots: { listChanged: true },
+  };
+  if (hasPrompts) {
+    capabilities.prompts = true;
+  }
   return {
     protocolVersion: "2025-06-18",
-    capabilities: {
-      tools: true,
-      prompts: true,
-      resources: true,
-      logging: false,
-      elicitation: {},
-      roots: { listChanged: true },
-    },
+    capabilities,
     serverInfo: { name: serverId, version: "mcpjam-proxy" },
   };
 }
@@ -80,7 +97,13 @@ export async function handleJsonRpc(
       case "ping":
         return respond({ result: {} });
       case "initialize": {
-        const result = buildInitializeResult(serverId, mode);
+        // AgntUX: pass upstream capabilities so the bridge advertises only supported features
+        const upstreamCaps = clientManager.getServerCapabilities(serverId);
+        const result = buildInitializeResult(
+          serverId,
+          mode,
+          upstreamCaps as Record<string, unknown> | undefined,
+        );
         return respond({ result });
       }
       case "tools/list": {
