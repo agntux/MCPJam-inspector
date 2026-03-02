@@ -26,6 +26,11 @@ import {
   listSkillFiles,
   readSkillFile,
 } from "@/lib/apis/mcp-skills-api";
+// AgntUX: filtered skills API for URL-only mode
+import {
+  listSkillsFiltered,
+  registerInstalledSkill,
+} from "../../../agntux/lib/filtered-skills-api";
 import type {
   Skill,
   SkillListItem,
@@ -88,6 +93,10 @@ export function SkillsTab() {
   useEffect(() => {
     const handleSkillInstalled = (e: Event) => {
       const name = (e as CustomEvent<{ name?: string }>).detail?.name;
+      // AgntUX: register installed skill so it's visible in URL-only mode
+      if (name) {
+        registerInstalledSkill(name);
+      }
       fetchSkills().then(() => {
         if (name) {
           setSelectedSkillName(name);
@@ -121,7 +130,8 @@ export function SkillsTab() {
     setError("");
 
     try {
-      const skillsList = await listSkills();
+      // AgntUX: use filtered list in URL-only mode
+      const skillsList = await listSkillsFiltered(Boolean(import.meta.env.VITE_CONVEX_URL));
       setSkills(skillsList);
 
       if (skillsList.length === 0) {

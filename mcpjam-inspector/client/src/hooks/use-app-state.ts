@@ -52,6 +52,9 @@ import { authFetch } from "@/lib/session-token";
 // AgntUX START — Import for ?skillUrl= auto-install feature
 import { installSkillFromUrl } from "@/lib/apis/mcp-skills-api";
 // AgntUX END
+// AgntUX: URL-only mode utilities
+import { isUrlOnlyMode } from "../../../agntux/lib/url-params";
+import { registerInstalledSkill } from "../../../agntux/lib/filtered-skills-api";
 export type { ServerWithName } from "@/state/app-types";
 
 /**
@@ -159,6 +162,11 @@ export function useAppState() {
 
   // Load from storage once
   useEffect(() => {
+    // AgntUX: Skip localStorage hydration in URL-only mode
+    if (isUrlOnlyMode(Boolean(import.meta.env.VITE_CONVEX_URL))) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const loaded = loadAppState();
       dispatch({ type: "HYDRATE_STATE", payload: loaded });
@@ -173,7 +181,8 @@ export function useAppState() {
 
   // Persist local state on change (only for unauthenticated mode or server runtime state)
   useEffect(() => {
-    if (!isLoading) saveAppState(appState);
+    // AgntUX: Skip persistence in URL-only mode
+    if (!isLoading && !isUrlOnlyMode(Boolean(import.meta.env.VITE_CONVEX_URL))) saveAppState(appState);
   }, [appState, isLoading]);
 
   // Convex timeout - fall back to local if Convex takes too long
@@ -1302,6 +1311,7 @@ export function useAppState() {
         installSkillFromUrl(skillUrlParam)
           .then((skill) => {
             toast.success(`Skill "${skill.name}" installed`);
+            registerInstalledSkill(skill.name); // AgntUX: Register for URL-only mode filtering
             // AgntUX: Notify SkillsTab to refresh and select the newly installed skill
             window.dispatchEvent(
               new CustomEvent("skill-installed", {
@@ -1313,10 +1323,12 @@ export function useAppState() {
             const msg = error instanceof Error ? error.message : "Unknown error";
             if (msg.includes("already exists")) {
               toast.info(msg);
+              const existingName = msg.match(/Skill '(.+)' already exists/)?.[1];
+              if (existingName) registerInstalledSkill(existingName); // AgntUX: Register existing skill for URL-only mode filtering
               // AgntUX: Still notify SkillsTab to select the existing skill
               window.dispatchEvent(
                 new CustomEvent("skill-installed", {
-                  detail: { name: msg.match(/Skill '(.+)' already exists/)?.[1] },
+                  detail: { name: existingName },
                 }),
               );
             } else {
@@ -1343,6 +1355,11 @@ export function useAppState() {
           };
           handleConnect(formData);
         }
+        return;
+      }
+
+      // AgntUX: In URL-only mode with only skill params, skip CLI config
+      if (isUrlOnlyMode(Boolean(import.meta.env.VITE_CONVEX_URL))) {
         return;
       }
 

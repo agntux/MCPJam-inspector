@@ -29,7 +29,8 @@ import {
 import { SkillsPopoverSection } from "../skills/skills-popover-section";
 import { SkillUploadDialog } from "../skills/skill-upload-dialog";
 import type { SkillResult } from "../skills/skill-types";
-import { listSkills } from "@/lib/apis/mcp-skills-api";
+// AgntUX: filtered skills API for URL-only mode
+import { listSkillsFiltered } from "../../../../../../agntux/lib/filtered-skills-api";
 
 export interface MCPPromptResult extends PromptListItem {
   result: PromptContentResponse;
@@ -129,7 +130,8 @@ export function PromptsPopover({
     let active = true;
     (async () => {
       try {
-        const skills = await listSkills();
+        // AgntUX: use filtered list in URL-only mode
+        const skills = await listSkillsFiltered(Boolean(import.meta.env.VITE_CONVEX_URL));
         if (!active) return;
         setSkillsCount(skills.length);
       } catch {
@@ -333,8 +335,8 @@ export function PromptsPopover({
         open={isSkillUploadDialogOpen}
         onOpenChange={setIsSkillUploadDialogOpen}
         onSkillCreated={(skill) => {
-          // Refresh skills count after creation
-          listSkills()
+          // AgntUX: use filtered list in URL-only mode
+          listSkillsFiltered(Boolean(import.meta.env.VITE_CONVEX_URL))
             .then((skills) => setSkillsCount(skills.length))
             .catch(() => {});
           // Optionally select the newly created skill

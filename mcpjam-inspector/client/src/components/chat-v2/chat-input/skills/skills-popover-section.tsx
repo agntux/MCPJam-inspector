@@ -6,7 +6,9 @@ import {
 import { cn } from "@/lib/chat-utils";
 import { SquareSlash, Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
-import { listSkills, getSkill } from "@/lib/apis/mcp-skills-api";
+import { getSkill } from "@/lib/apis/mcp-skills-api";
+// AgntUX: filtered skills API for URL-only mode
+import { listSkillsFiltered } from "../../../../../../agntux/lib/filtered-skills-api";
 import type { SkillListItem, SkillResult } from "./skill-types";
 import { usePostHog } from "posthog-js/react";
 
@@ -40,7 +42,8 @@ export function SkillsPopoverSection({
     (async () => {
       try {
         setIsLoading(true);
-        const skillsList = await listSkills();
+        // AgntUX: use filtered list in URL-only mode
+        const skillsList = await listSkillsFiltered(Boolean(import.meta.env.VITE_CONVEX_URL));
         if (!active) return;
         setSkills(skillsList);
       } catch (err) {
@@ -168,7 +171,8 @@ export function useSkillsCount(): { count: number; isLoading: boolean } {
     let active = true;
     (async () => {
       try {
-        const skills = await listSkills();
+        // AgntUX: use filtered list in URL-only mode
+        const skills = await listSkillsFiltered(Boolean(import.meta.env.VITE_CONVEX_URL));
         if (!active) return;
         setCount(skills.length);
       } catch {
