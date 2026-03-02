@@ -4,7 +4,9 @@
 
 import { authFetch } from "@/lib/session-token";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:6274";
+// AgntUX: Use empty string (relative URL) as fallback instead of http://localhost:6274
+// to avoid Chrome Private Network Access prompts on remote deployments
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 export interface TunnelResponse {
   url: string;

@@ -372,6 +372,10 @@ export function useChatSession({
 
   // Ollama model detection
   useEffect(() => {
+    // AgntUX: Skip Ollama detection in self-hosted mode — direct browser-to-localhost
+    // fetch calls trigger Chrome's Private Network Access prompt on remote deployments
+    if (!hasConvex) return;
+
     const checkOllama = async () => {
       const { isRunning, availableModels } =
         await detectOllamaModels(getOllamaBaseUrl());
@@ -397,7 +401,7 @@ export function useChatSession({
     checkOllama();
     const interval = setInterval(checkOllama, 30000);
     return () => clearInterval(interval);
-  }, [getOllamaBaseUrl]);
+  }, [getOllamaBaseUrl, hasConvex]);
 
   // Fetch tools metadata
   useEffect(() => {
