@@ -25,7 +25,6 @@ export function getAgntUXUrlParams(): AgntUXUrlParams {
   const mcpServerUrl = urlParams.getAll("mcpServerUrl");
   const skillUrl = urlParams.getAll("skillUrl");
   const skillName = urlParams.getAll("skillName");
-
   cachedParams = {
     mcpServerUrl,
     skillUrl,

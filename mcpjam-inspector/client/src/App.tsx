@@ -18,8 +18,9 @@ import { ProfileTab } from "./components/ProfileTab";
 import { OrganizationsTab } from "./components/OrganizationsTab";
 import { SupportTab } from "./components/SupportTab";
 import OAuthDebugCallback from "./components/oauth/OAuthDebugCallback";
-import { MCPSidebar } from "./components/mcp-sidebar";
-import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
+// AgntUX: MCPSidebar, SidebarInset, SidebarProvider, Header hidden for embedded deployment
+// import { MCPSidebar } from "./components/mcp-sidebar";
+// import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { useAppState } from "./hooks/use-app-state";
 import { PreferencesStoreProvider } from "./stores/preferences/preferences-provider";
 import { Toaster } from "./components/ui/sonner";
@@ -40,9 +41,9 @@ import {
 } from "./lib/theme-utils";
 import CompletingSignInLoading from "./components/CompletingSignInLoading";
 import LoadingScreen from "./components/LoadingScreen";
-import { Header } from "./components/Header";
+// import { Header } from "./components/Header";
 import { ThemePreset } from "./types/preferences/theme";
-import type { ActiveServerSelectorProps } from "./components/ActiveServerSelector";
+// import type { ActiveServerSelectorProps } from "./components/ActiveServerSelector";
 import { useViewQueries, useWorkspaceServers } from "./hooks/useViews";
 
 export default function App() {
@@ -224,164 +225,127 @@ export default function App() {
     return <LoadingScreen />;
   }
 
-  const shouldShowActiveServerSelector =
-    activeTab === "tools" ||
-    activeTab === "resources" ||
-    activeTab === "prompts" ||
-    activeTab === "tasks" ||
-    activeTab === "oauth-flow" ||
-    activeTab === "chat" ||
-    activeTab === "chat-v2" ||
-    activeTab === "app-builder" ||
-    activeTab === "evals" ||
-    activeTab === "views";
-
-  const activeServerSelectorProps: ActiveServerSelectorProps | undefined =
-    shouldShowActiveServerSelector
-      ? {
-          serverConfigs:
-            activeTab === "oauth-flow"
-              ? appState.servers
-              : activeTab === "views"
-                ? workspaceServers
-                : connectedOrConnectingServerConfigs,
-          selectedServer: appState.selectedServer,
-          onServerChange: setSelectedServer,
-          onConnect: handleConnect,
-          onReconnect: handleReconnect,
-          isMultiSelectEnabled: activeTab === "chat" || activeTab === "chat-v2",
-          onMultiServerToggle: toggleServerSelection,
-          selectedMultipleServers: appState.selectedMultipleServers,
-          showOnlyOAuthServers: activeTab === "oauth-flow",
-          showOnlyServersWithViews: activeTab === "views",
-          serversWithViews: serversWithViews,
-          hasMessages: activeTab === "chat-v2" ? chatHasMessages : false,
-        }
-      : undefined;
-
-  const appContent = (
-    <SidebarProvider defaultOpen={true}>
-      <MCPSidebar
-        onNavigate={handleNavigate}
-        activeTab={activeTab}
-        servers={workspaceServers}
-      />
-      <SidebarInset className="flex flex-col min-h-0">
-        <Header activeServerSelectorProps={activeServerSelectorProps} />
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden h-full">
-          {/* Content Areas */}
-          {activeTab === "servers" && (
-            <ServersTab
-              connectedOrConnectingServerConfigs={workspaceServers}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-              onReconnect={handleReconnect}
-              onUpdate={handleUpdate}
-              onRemove={handleRemoveServer}
-              workspaces={workspaces}
-              activeWorkspaceId={activeWorkspaceId}
-              onSwitchWorkspace={handleSwitchWorkspace}
-              onCreateWorkspace={handleCreateWorkspace}
-              onUpdateWorkspace={handleUpdateWorkspace}
-              onDeleteWorkspace={handleDeleteWorkspace}
-              isLoadingWorkspaces={isLoadingRemoteWorkspaces}
-              onWorkspaceShared={handleWorkspaceShared}
-              onLeaveWorkspace={() => handleLeaveWorkspace(activeWorkspaceId)}
-            />
-          )}
-          {activeTab === "tools" && (
-            <div className="h-full overflow-hidden">
-              <ToolsTab
-                serverConfig={selectedMCPConfig}
-                serverName={appState.selectedServer}
-              />
-            </div>
-          )}
-          {activeTab === "evals" && (
-            <EvalsTab selectedServer={appState.selectedServer} />
-          )}
-          {activeTab === "views" && (
-            <ViewsTab
-              selectedServer={appState.selectedServer}
-              onWorkspaceShared={handleWorkspaceShared}
-              onLeaveWorkspace={() => handleLeaveWorkspace(activeWorkspaceId)}
-            />
-          )}
-          {activeTab === "resources" && (
-            <div className="h-full overflow-hidden">
-              <ResourcesTab
-                serverConfig={selectedMCPConfig}
-                serverName={appState.selectedServer}
-              />
-            </div>
-          )}
-
-          {activeTab === "prompts" && (
-            <div className="h-full overflow-hidden">
-              <PromptsTab
-                serverConfig={selectedMCPConfig}
-                serverName={appState.selectedServer}
-              />
-            </div>
-          )}
-
-          {activeTab === "skills" && <SkillsTab />}
-
-          <div
-            className={
-              activeTab === "tasks" ? "h-full overflow-hidden" : "hidden"
-            }
-          >
-            <TasksTab
-              serverConfig={selectedMCPConfig}
-              serverName={appState.selectedServer}
-              isActive={activeTab === "tasks"}
-            />
-          </div>
-
-          {activeTab === "auth" && (
-            <AuthTab
-              serverConfig={selectedMCPConfig}
-              serverEntry={appState.servers[appState.selectedServer]}
-              serverName={appState.selectedServer}
-            />
-          )}
-
-          {activeTab === "oauth-flow" && (
-            <OAuthFlowTab
-              serverConfigs={appState.servers}
-              selectedServerName={appState.selectedServer}
-              onSelectServer={setSelectedServer}
-              onSaveServerConfig={saveServerConfigWithoutConnecting}
-              onConnectWithTokens={handleConnectWithTokensFromOAuthFlow}
-              onRefreshTokens={handleRefreshTokensFromOAuthFlow}
-            />
-          )}
-          {activeTab === "chat-v2" && (
-            <ChatTabV2
-              connectedOrConnectingServerConfigs={
-                connectedOrConnectingServerConfigs
-              }
-              selectedServerNames={appState.selectedMultipleServers}
-              onHasMessagesChange={setChatHasMessages}
-            />
-          )}
-          {activeTab === "tracing" && <TracingTab />}
-          {activeTab === "app-builder" && (
-            <AppBuilderTab
-              serverConfig={selectedMCPConfig}
-              serverName={appState.selectedServer}
-            />
-          )}
-          {activeTab === "settings" && <SettingsTab />}
-          {activeTab === "support" && <SupportTab />}
-          {activeTab === "profile" && <ProfileTab />}
-          {activeTab === "organizations" && (
-            <OrganizationsTab organizationId={activeOrganizationId} />
-          )}
+  // AgntUX: Header and ActiveServerSelector removed — nav hidden for embedded deployment
+  const tabContent = (
+    <div className="flex flex-1 min-h-0 flex-col overflow-hidden h-full">
+      {/* Content Areas */}
+      {activeTab === "servers" && (
+        <ServersTab
+          connectedOrConnectingServerConfigs={workspaceServers}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
+          onReconnect={handleReconnect}
+          onUpdate={handleUpdate}
+          onRemove={handleRemoveServer}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          onSwitchWorkspace={handleSwitchWorkspace}
+          onCreateWorkspace={handleCreateWorkspace}
+          onUpdateWorkspace={handleUpdateWorkspace}
+          onDeleteWorkspace={handleDeleteWorkspace}
+          isLoadingWorkspaces={isLoadingRemoteWorkspaces}
+          onWorkspaceShared={handleWorkspaceShared}
+          onLeaveWorkspace={() => handleLeaveWorkspace(activeWorkspaceId)}
+        />
+      )}
+      {activeTab === "tools" && (
+        <div className="h-full overflow-hidden">
+          <ToolsTab
+            serverConfig={selectedMCPConfig}
+            serverName={appState.selectedServer}
+          />
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      )}
+      {activeTab === "evals" && (
+        <EvalsTab selectedServer={appState.selectedServer} />
+      )}
+      {activeTab === "views" && (
+        <ViewsTab
+          selectedServer={appState.selectedServer}
+          onWorkspaceShared={handleWorkspaceShared}
+          onLeaveWorkspace={() => handleLeaveWorkspace(activeWorkspaceId)}
+        />
+      )}
+      {activeTab === "resources" && (
+        <div className="h-full overflow-hidden">
+          <ResourcesTab
+            serverConfig={selectedMCPConfig}
+            serverName={appState.selectedServer}
+          />
+        </div>
+      )}
+
+      {activeTab === "prompts" && (
+        <div className="h-full overflow-hidden">
+          <PromptsTab
+            serverConfig={selectedMCPConfig}
+            serverName={appState.selectedServer}
+          />
+        </div>
+      )}
+
+      {activeTab === "skills" && <SkillsTab />}
+
+      <div
+        className={
+          activeTab === "tasks" ? "h-full overflow-hidden" : "hidden"
+        }
+      >
+        <TasksTab
+          serverConfig={selectedMCPConfig}
+          serverName={appState.selectedServer}
+          isActive={activeTab === "tasks"}
+        />
+      </div>
+
+      {activeTab === "auth" && (
+        <AuthTab
+          serverConfig={selectedMCPConfig}
+          serverEntry={appState.servers[appState.selectedServer]}
+          serverName={appState.selectedServer}
+        />
+      )}
+
+      {activeTab === "oauth-flow" && (
+        <OAuthFlowTab
+          serverConfigs={appState.servers}
+          selectedServerName={appState.selectedServer}
+          onSelectServer={setSelectedServer}
+          onSaveServerConfig={saveServerConfigWithoutConnecting}
+          onConnectWithTokens={handleConnectWithTokensFromOAuthFlow}
+          onRefreshTokens={handleRefreshTokensFromOAuthFlow}
+        />
+      )}
+      {activeTab === "chat-v2" && (
+        <ChatTabV2
+          connectedOrConnectingServerConfigs={
+            connectedOrConnectingServerConfigs
+          }
+          selectedServerNames={appState.selectedMultipleServers}
+          onHasMessagesChange={setChatHasMessages}
+        />
+      )}
+      {activeTab === "tracing" && <TracingTab />}
+      {activeTab === "app-builder" && (
+        <AppBuilderTab
+          serverConfig={selectedMCPConfig}
+          serverName={appState.selectedServer}
+        />
+      )}
+      {activeTab === "settings" && <SettingsTab />}
+      {activeTab === "support" && <SupportTab />}
+      {activeTab === "profile" && <ProfileTab />}
+      {activeTab === "organizations" && (
+        <OrganizationsTab organizationId={activeOrganizationId} />
+      )}
+    </div>
+  );
+
+  // AgntUX: hide top nav and sidebar for embedded deployment
+  const appContent = (
+    <div className="flex flex-col min-h-0 h-screen w-screen">
+      {tabContent}
+    </div>
   );
 
   return (
