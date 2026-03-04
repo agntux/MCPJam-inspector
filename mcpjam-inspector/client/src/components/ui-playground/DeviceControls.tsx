@@ -4,31 +4,20 @@
  * Device emulation and theme controls for the UI Playground
  */
 
-import { Smartphone, Tablet, Monitor, Sun, Moon } from "lucide-react";
-import { Button } from "../ui/button";
+import { Smartphone, Tablet, Monitor } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import type { DeviceType } from "@/stores/ui-playground-store";
-import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
-import { updateThemeMode } from "@/lib/theme-utils";
 
 interface DeviceControlsProps {
   deviceType: DeviceType;
   onDeviceTypeChange: (type: DeviceType) => void;
 }
 
+// AgntUX: theme toggle removed — dark mode is always on
 export function DeviceControls({
   deviceType,
   onDeviceTypeChange,
 }: DeviceControlsProps) {
-  const themeMode = usePreferencesStore((s) => s.themeMode);
-  const setThemeMode = usePreferencesStore((s) => s.setThemeMode);
-
-  const handleThemeChange = () => {
-    const newTheme = themeMode === "dark" ? "light" : "dark";
-    updateThemeMode(newTheme);
-    setThemeMode(newTheme);
-  };
-
   return (
     <div className="px-4 py-3 border-t border-border bg-background flex-shrink-0">
       <div className="flex items-center justify-center gap-3">
@@ -64,23 +53,6 @@ export function DeviceControls({
             <Monitor className="h-4 w-4" />
           </ToggleGroupItem>
         </ToggleGroup>
-
-        <div className="w-px h-5 bg-border" aria-hidden="true" />
-
-        {/* Theme Toggle */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleThemeChange}
-          className="h-8 w-8 p-0"
-          title={`Switch to ${themeMode === "dark" ? "light" : "dark"} mode`}
-        >
-          {themeMode === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </Button>
       </div>
     </div>
   );

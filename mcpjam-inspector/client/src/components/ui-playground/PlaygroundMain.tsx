@@ -669,7 +669,8 @@ export function PlaygroundMain({
       {/* Device frame header */}
       <div className="relative flex items-center justify-center px-3 py-2 border-b border-border bg-background/50 text-xs text-muted-foreground flex-shrink-0">
         {/* All controls centered */}
-        <DisplayContextHeader protocol={selectedProtocol} showThemeToggle />
+        {/* AgntUX: showThemeToggle removed — dark mode is always on */}
+        <DisplayContextHeader protocol={selectedProtocol} />
 
         {/* Right actions - absolutely positioned */}
         {!isThreadEmpty && (

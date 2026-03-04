@@ -8,15 +8,9 @@ import {
   ThemePreset,
 } from "@/types/preferences/theme";
 
-// Utility to get the initial theme mode from localStorage or fallback to 'light'.
+// AgntUX: always dark mode — ignore localStorage
 export function getInitialThemeMode(): ThemeMode {
-  try {
-    const stored = localStorage.getItem(THEME_MODE_KEY);
-    if (stored === "dark" || stored === "light") return stored;
-  } catch (error) {
-    console.warn("Cannot access localStorage for theme mode:", error);
-  }
-  return "light";
+  return "dark";
 }
 
 export function updateThemeMode(value: ThemeMode) {

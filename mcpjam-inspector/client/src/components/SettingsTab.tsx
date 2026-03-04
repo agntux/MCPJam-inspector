@@ -265,24 +265,7 @@ export function SettingsTab() {
           <SettingsRow label="Version" value={`v${__APP_VERSION__}`} />
         </SettingsSection>
 
-        {/* Appearance */}
-        <SettingsSection title="Appearance">
-          <SettingsRow
-            label="Theme"
-            value={
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {themeMode === "dark" ? "Dark" : "Light"}
-                </span>
-                <Switch
-                  checked={themeMode === "dark"}
-                  onCheckedChange={handleThemeToggle}
-                  aria-label="Toggle dark mode"
-                />
-              </div>
-            }
-          />
-        </SettingsSection>
+        {/* AgntUX: Appearance section removed — dark mode is always on */}
 
         {/* LLM Providers */}
         <SettingsSection title="LLM Providers">
