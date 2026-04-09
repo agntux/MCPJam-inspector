@@ -44,6 +44,13 @@ chatV2.post("/", async (c) => {
       return c.json({ error: "messages are required" }, 400);
     }
 
+    // AgntUX START — Validate appId format to prevent URL injection
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (appId && !UUID_RE.test(appId)) {
+      return c.json({ error: "Invalid appId format" }, 400);
+    }
+    // AgntUX END
+
     const modelDefinition = model;
     if (!modelDefinition) {
       return c.json({ error: "model is not supported" }, 400);
