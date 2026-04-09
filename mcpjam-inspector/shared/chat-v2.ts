@@ -19,4 +19,6 @@ export interface ChatV2Request {
   }>;
   selectedServers?: string[];
   requireToolApproval?: boolean;
+  /** AgntUX app ID — when present, token usage is logged to the platform for credit tracking. */
+  appId?: string;
 }

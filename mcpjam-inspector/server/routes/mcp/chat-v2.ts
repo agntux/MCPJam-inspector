@@ -18,6 +18,7 @@ import { logger } from "../../utils/logger";
 import { getSkillToolsAndPrompt } from "../../utils/skill-tools";
 import { handleMCPJamFreeChatModel } from "../../utils/mcpjam-stream-handler";
 import type { ModelMessage } from "@ai-sdk/provider-utils";
+import { logUsageFireAndForget } from "../../../agntux/lib/log-usage";
 
 const DEFAULT_TEMPERATURE = 0.7;
 
@@ -35,6 +36,7 @@ chatV2.post("/", async (c) => {
       temperature,
       selectedServers,
       requireToolApproval,
+      appId,
     } = body;
 
     // Validation
@@ -163,6 +165,20 @@ chatV2.post("/", async (c) => {
       system: enhancedSystemPrompt,
       tools: allTools as ToolSet,
       stopWhen: stepCountIs(20),
+      // AgntUX START — Log token usage to platform for credit tracking
+      onFinish: appId
+        ? ({ usage }) => {
+            logUsageFireAndForget({
+              appId,
+              messageId: crypto.randomUUID(),
+              model: modelDefinition?.id ?? "unknown",
+              modelProvider: modelDefinition?.provider ?? "unknown",
+              promptTokens: usage.promptTokens,
+              completionTokens: usage.completionTokens,
+            });
+          }
+        : undefined,
+      // AgntUX END
     });
 
     return result.toUIMessageStreamResponse({
