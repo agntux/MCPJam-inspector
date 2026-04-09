@@ -18,6 +18,8 @@ interface LogUsageParams {
   promptTokens: number;
   completionTokens: number;
   cachedTokens?: number;
+  cache5mWriteTokens?: number;
+  cache1hWriteTokens?: number;
 }
 
 /**

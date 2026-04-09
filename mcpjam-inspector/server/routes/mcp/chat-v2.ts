@@ -180,8 +180,11 @@ chatV2.post("/", async (c) => {
               messageId: crypto.randomUUID(),
               model: modelDefinition?.id ?? "unknown",
               modelProvider: modelDefinition?.provider ?? "unknown",
-              promptTokens: usage.promptTokens,
-              completionTokens: usage.completionTokens,
+              promptTokens: usage.inputTokens ?? 0,
+              completionTokens: usage.outputTokens ?? 0,
+              cachedTokens: usage.inputTokenDetails?.cacheReadTokens ?? 0,
+              cache5mWriteTokens: usage.inputTokenDetails?.cacheWriteTokens ?? 0,
+              cache1hWriteTokens: 0,
             });
           }
         : undefined,
