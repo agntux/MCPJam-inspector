@@ -149,6 +149,8 @@ function buildAvailableModels(params: {
   // AgntUX: Hide MCPJam free-tier models when Convex is not configured (self-hosted)
   const cloud = SUPPORTED_MODELS.filter((m) => {
     if (isMCPJamProvidedModel(m.id)) return hasConvex;
+    // AgntUX: limit to only Claude Sonnet 4.5 in self-hosted mode
+    if (!hasConvex && m.id !== 'claude-sonnet-4-5') return false;
     return providerHasKey[m.provider];
   });
 
@@ -187,10 +189,10 @@ const MODEL_MISTRAL_LARGE_LATEST = 'mistral-large-latest';
 
 function getDefaultModel(availableModels: ModelDefinition[]): ModelDefinition {
   const modelIdsByPriority: string[] = [
+    MODEL_CLAUDE_SONNET_4_5, // AgntUX: Sonnet 4.5 is the only model in self-hosted mode
     'anthropic/claude-haiku-4.5',
     'openai/gpt-5-mini',
     'meta-llama/llama-4-scout',
-    MODEL_CLAUDE_SONNET_4_5,
     MODEL_CLAUDE_SONNET_4_0,
     MODEL_CLAUDE_HAIKU_4_5,
     MODEL_CLAUDE_3_7_SONNET_LATEST,
@@ -272,12 +274,13 @@ describe('parseModelAliases', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('buildAvailableModels — serverProviders (AgntUX self-hosted key fallback)', () => {
-  it('includes anthropic models when serverProviders contains "anthropic" and no client token', () => {
+  it('includes only claude-sonnet-4-5 when serverProviders contains "anthropic" in self-hosted mode', () => {
     const models = buildAvailableModels(
       baseParams({ serverProviders: ['anthropic'] }),
     );
-    const providers = models.map((m) => m.provider);
-    expect(providers).toContain('anthropic');
+    // AgntUX: self-hosted mode (hasConvex=false) limits to only Sonnet 4.5
+    expect(models).toHaveLength(1);
+    expect(models[0].id).toBe('claude-sonnet-4-5');
   });
 
   it('does not include anthropic models when neither client token nor serverProvider is set', () => {
@@ -286,56 +289,32 @@ describe('buildAvailableModels — serverProviders (AgntUX self-hosted key fallb
     expect(anthropicModels).toHaveLength(0);
   });
 
-  it('includes openai models when serverProviders contains "openai"', () => {
+  it('excludes non-Sonnet-4.5 models in self-hosted mode even with serverProviders', () => {
+    // AgntUX: in self-hosted (hasConvex=false), only claude-sonnet-4-5 is allowed
     const models = buildAvailableModels(baseParams({ serverProviders: ['openai'] }));
     const openaiModels = models.filter((m) => m.provider === 'openai' && !isMCPJamProvidedModel(m.id));
-    expect(openaiModels.length).toBeGreaterThan(0);
+    expect(openaiModels).toHaveLength(0);
   });
 
-  it('includes deepseek models when serverProviders contains "deepseek"', () => {
-    const models = buildAvailableModels(baseParams({ serverProviders: ['deepseek'] }));
+  it('includes all provider models when hasConvex is true (non-self-hosted)', () => {
+    const models = buildAvailableModels(
+      baseParams({ hasConvex: true, serverProviders: ['anthropic', 'openai', 'deepseek', 'google', 'mistral', 'xai'] }),
+    );
     const ids = models.map((m) => m.id);
+    expect(ids).toContain('claude-sonnet-4-5');
+    expect(ids).toContain('gpt-4.1');
     expect(ids).toContain('deepseek-chat');
-  });
-
-  it('includes google models when serverProviders contains "google"', () => {
-    const models = buildAvailableModels(baseParams({ serverProviders: ['google'] }));
-    const ids = models.map((m) => m.id);
     expect(ids).toContain('gemini-2.5-pro');
-  });
-
-  it('includes mistral models when serverProviders contains "mistral"', () => {
-    const models = buildAvailableModels(baseParams({ serverProviders: ['mistral'] }));
-    const ids = models.map((m) => m.id);
     expect(ids).toContain('mistral-large-latest');
-  });
-
-  it('includes xai models when serverProviders contains "xai"', () => {
-    const models = buildAvailableModels(baseParams({ serverProviders: ['xai'] }));
-    const ids = models.map((m) => m.id);
     expect(ids).toContain('grok-3');
   });
 
-  it('combines client token and serverProvider — union of both', () => {
-    const hasTokenFn = (p: keyof ProviderTokens) => p === 'openai';
-    const models = buildAvailableModels(
-      baseParams({ hasToken: hasTokenFn, serverProviders: ['anthropic'] }),
-    );
-    const ids = models.map((m) => m.id);
-    // openai from client token
-    expect(ids).toContain('gpt-4.1');
-    // anthropic from serverProviders
-    expect(ids).toContain('claude-sonnet-4-5');
-  });
-
-  it('multiple serverProviders are all respected', () => {
+  it('self-hosted mode only returns claude-sonnet-4-5 even with multiple serverProviders', () => {
     const models = buildAvailableModels(
       baseParams({ serverProviders: ['anthropic', 'openai', 'deepseek'] }),
     );
     const ids = models.map((m) => m.id);
-    expect(ids).toContain('claude-sonnet-4-5');
-    expect(ids).toContain('gpt-4.1');
-    expect(ids).toContain('deepseek-chat');
+    expect(ids).toEqual(['claude-sonnet-4-5']);
   });
 
   it('defaults serverProviders to [] when not provided — no server-side models added', () => {
@@ -361,7 +340,7 @@ describe('buildAvailableModels — MCPJam free-tier models hidden without Convex
     expect(mcpjamModels.length).toBeGreaterThan(0);
   });
 
-  it('non-MCPJam models are not filtered by hasConvex flag', () => {
+  it('self-hosted mode limits to only claude-sonnet-4-5, Convex mode shows all provider models', () => {
     const modelsWithConvex = buildAvailableModels(
       baseParams({ hasConvex: true, serverProviders: ['anthropic'] }),
     );
@@ -370,8 +349,10 @@ describe('buildAvailableModels — MCPJam free-tier models hidden without Convex
     );
     const regularWithConvex = modelsWithConvex.filter((m) => !isMCPJamProvidedModel(m.id));
     const regularWithoutConvex = modelsWithoutConvex.filter((m) => !isMCPJamProvidedModel(m.id));
-    // Regular (non-free-tier) models should be identical regardless of hasConvex
-    expect(regularWithConvex.map((m) => m.id)).toEqual(regularWithoutConvex.map((m) => m.id));
+    // AgntUX: self-hosted mode only returns Sonnet 4.5
+    expect(regularWithoutConvex.map((m) => m.id)).toEqual(['claude-sonnet-4-5']);
+    // Convex mode returns all anthropic models
+    expect(regularWithConvex.length).toBeGreaterThan(1);
   });
 
   it('all MCPJam-provided model IDs in SUPPORTED_MODELS are correctly identified', () => {
@@ -457,10 +438,11 @@ describe('getDefaultModel', () => {
     const models: ModelDefinition[] = [
       { id: 'anthropic/claude-haiku-4.5', name: 'Haiku Free', provider: 'anthropic' },
       { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai' },
+      { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
     ];
     const result = getDefaultModel(models);
-    // anthropic/claude-haiku-4.5 is first in priority list
-    expect(result.id).toBe('anthropic/claude-haiku-4.5');
+    // AgntUX: claude-sonnet-4-5 is first in priority list
+    expect(result.id).toBe('claude-sonnet-4-5');
   });
 
   it('falls back down the priority list when top models are missing', () => {
@@ -488,23 +470,15 @@ describe('getDefaultModel', () => {
     expect(result.provider).toBe('anthropic');
   });
 
-  it('prefers openai/gpt-5-mini (MCPJam free) over claude-sonnet-4-5 (paid)', () => {
+  it('prefers claude-sonnet-4-5 over MCPJam free-tier models (AgntUX)', () => {
     const models: ModelDefinition[] = [
       { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
       { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini Free', provider: 'openai' },
-    ];
-    // Priority order: anthropic/claude-haiku-4.5 → openai/gpt-5-mini → meta-llama/llama-4-scout → claude-sonnet-4-5
-    const result = getDefaultModel(models);
-    expect(result.id).toBe('openai/gpt-5-mini');
-  });
-
-  it('prefers meta-llama/llama-4-scout over claude-sonnet-4-5 (paid)', () => {
-    const models: ModelDefinition[] = [
-      { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
       { id: 'meta-llama/llama-4-scout', name: 'Llama 4 Scout Free', provider: 'meta' },
     ];
+    // AgntUX: claude-sonnet-4-5 is now top priority
     const result = getDefaultModel(models);
-    expect(result.id).toBe('meta-llama/llama-4-scout');
+    expect(result.id).toBe('claude-sonnet-4-5');
   });
 
   it('does not throw when called with an empty array', () => {

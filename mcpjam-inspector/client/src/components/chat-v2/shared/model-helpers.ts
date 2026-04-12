@@ -59,6 +59,8 @@ export function buildAvailableModels(params: {
   const hasConvex = Boolean(import.meta.env.VITE_CONVEX_URL);
   const cloud = SUPPORTED_MODELS.filter((m) => {
     if (isMCPJamProvidedModel(m.id)) return hasConvex;
+    // AgntUX: limit to only Claude Sonnet 4.5 in self-hosted mode
+    if (!hasConvex && m.id !== Model.CLAUDE_SONNET_4_5) return false;
     return providerHasKey[m.provider];
   });
 
@@ -91,10 +93,10 @@ export const getDefaultModel = (
   availableModels: ModelDefinition[],
 ): ModelDefinition => {
   const modelIdsByPriority: Array<Model | string> = [
+    Model.CLAUDE_SONNET_4_5, // AgntUX: Sonnet 4.5 is the only model in self-hosted mode
     "anthropic/claude-haiku-4.5",
     "openai/gpt-5-mini",
     "meta-llama/llama-4-scout",
-    Model.CLAUDE_SONNET_4_5, // anthropic (preferred — claude-3-7-sonnet-latest is deprecated)
     Model.CLAUDE_SONNET_4_0, // anthropic
     Model.CLAUDE_HAIKU_4_5, // anthropic (cheapest current model)
     Model.CLAUDE_3_7_SONNET_LATEST, // anthropic (legacy fallback)
