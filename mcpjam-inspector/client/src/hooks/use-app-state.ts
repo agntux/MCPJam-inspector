@@ -1342,6 +1342,18 @@ export function useAppState() {
       if (mcpServerUrlParams.length > 0) {
         // AgntUX: Support mcpServerName URL params for human-readable server names
         const mcpServerNameParams = urlParams.getAll("mcpServerName");
+        // AgntUX: Support mcpAuth URL param for passing test tokens as Authorization header
+        const mcpAuthParam = urlParams.get("mcpAuth");
+        // Strip token from URL to avoid persisting in browser history
+        if (mcpAuthParam) {
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("mcpAuth");
+          window.history.replaceState({}, "", cleanUrl.toString());
+        }
+        // Sanitize: trim whitespace and strip redundant "Bearer " prefix if present
+        const sanitizedToken = mcpAuthParam
+          ? mcpAuthParam.trim().replace(/^Bearer\s+/i, "")
+          : undefined;
         logger.info("Auto-connecting to MCP server(s) from URL parameter", {
           mcpServerUrls: mcpServerUrlParams,
         });
@@ -1352,6 +1364,10 @@ export function useAppState() {
             type: "http" as const,
             url: uniqueUrls[i],
             env: {},
+            // Only apply auth to the first server (mcp_app); mock servers don't need it
+            ...(sanitizedToken && i === 0
+              ? { headers: { Authorization: `Bearer ${sanitizedToken}` } }
+              : {}),
           };
           handleConnect(formData);
         }
