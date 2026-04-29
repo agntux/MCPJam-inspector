@@ -49,8 +49,8 @@ import {
 import { MCPServerConfig } from "@mcpjam/sdk";
 import type { OAuthTestProfile } from "@/lib/oauth/profile";
 import { authFetch } from "@/lib/session-token";
-// AgntUX START — Import for ?skillUrl= auto-install feature
-import { installSkillFromUrl } from "@/lib/apis/mcp-skills-api";
+// AgntUX START — Import for ?skillUrl= / ?pluginUrl= auto-install features
+import { installSkillFromUrl, installPluginFromUrl } from "@/lib/apis/mcp-skills-api";
 // AgntUX END
 // AgntUX: URL-only mode utilities
 import { isUrlOnlyMode } from "../../../agntux/lib/url-params";
@@ -1336,6 +1336,37 @@ export function useAppState() {
             }
           });
         // Don't return — allow CLI config processing to continue
+      }
+      // AgntUX END
+
+      // AgntUX START — Auto-install plugin from ?pluginUrl= query parameter
+      // Plugin tarballs (.tar.gz / .zip) are handled by the same /install-from-url
+      // endpoint but return plugin metadata instead of a Skill object.
+      const pluginUrlParam = urlParams.get("pluginUrl");
+      if (pluginUrlParam) {
+        logger.info("Auto-installing plugin from URL parameter", {
+          pluginUrl: pluginUrlParam,
+        });
+        installPluginFromUrl(pluginUrlParam)
+          .then((plugin) => {
+            toast.success(`Plugin "${plugin.slug}" v${plugin.version} installed`);
+            // Notify AppBuilderTab so it can register the active plugin slug
+            window.dispatchEvent(
+              new CustomEvent("plugin-installed", {
+                detail: {
+                  slug: plugin.slug,
+                  version: plugin.version,
+                  skillName: plugin.skillName,
+                  mcpServers: plugin.mcpServers,
+                },
+              }),
+            );
+          })
+          .catch((error) => {
+            const msg = error instanceof Error ? error.message : "Unknown error";
+            toast.error(`Failed to install plugin: ${msg}`);
+          });
+        // Don't return — allow MCP server auto-connect to also proceed
       }
       // AgntUX END
 

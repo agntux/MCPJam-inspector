@@ -105,6 +105,33 @@ export async function installSkillFromUrl(url: string): Promise<Skill> {
   }
   return body.skill as Skill;
 }
+
+/**
+ * Result returned by the server when installing a plugin tarball.
+ */
+export interface PluginInstallResult {
+  slug: string;
+  version: string;
+  skillName: string;
+  mcpServers: Array<{ command: string; args?: string[]; env?: Record<string, string> }>;
+}
+
+/**
+ * Install a plugin from a tarball/zip URL (?pluginUrl= mode).
+ * Returns plugin metadata (slug, version, skillName, mcpServers).
+ */
+export async function installPluginFromUrl(url: string): Promise<PluginInstallResult> {
+  const res = await authFetch("/api/mcp/skills/install-from-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(body?.error || `Failed to install plugin (${res.status})`);
+  }
+  return body.plugin as PluginInstallResult;
+}
 // AgntUX END
 
 /**

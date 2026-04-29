@@ -3,6 +3,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AppBuilderTab } from "../AppBuilderTab";
 import type { MCPServerConfig } from "@mcpjam/sdk";
 
+// AgntUX: Mock shared app state (required by AppBuilderTab's useSharedAppState call)
+import { useSharedAppState } from "@/state/app-state-context";
+vi.mock("@/state/app-state-context", () => ({
+  useSharedAppState: vi.fn(),
+}));
+const mockUseSharedAppState = vi.mocked(useSharedAppState);
+
 // Mock posthog
 vi.mock("posthog-js/react", () => ({
   usePostHog: () => ({
@@ -207,10 +214,17 @@ describe("AppBuilderTab", () => {
       isExecuting: false,
       isSidebarVisible: true,
     });
+
+    // AgntUX: Default — expose "test-server" as connected (most tests use this name)
+    mockUseSharedAppState.mockReturnValue({
+      servers: { "test-server": { connectionStatus: "connected" } },
+    });
   });
 
   describe("empty state", () => {
     it("shows empty state when no server config provided", () => {
+      // AgntUX: no connected servers
+      mockUseSharedAppState.mockReturnValue({ servers: {} });
       render(<AppBuilderTab />);
 
       expect(screen.getByText("No Server Selected")).toBeInTheDocument();
@@ -220,6 +234,8 @@ describe("AppBuilderTab", () => {
     });
 
     it("shows empty state when serverConfig is undefined", () => {
+      // AgntUX: no connected servers
+      mockUseSharedAppState.mockReturnValue({ servers: {} });
       render(<AppBuilderTab serverConfig={undefined} serverName="test" />);
 
       expect(screen.getByText("No Server Selected")).toBeInTheDocument();
@@ -444,6 +460,11 @@ describe("AppBuilderTab", () => {
     it("refetches tools when serverName changes", async () => {
       const serverConfig = createServerConfig();
 
+      // AgntUX: server-1 connected on initial render
+      mockUseSharedAppState.mockReturnValue({
+        servers: { "server-1": { connectionStatus: "connected" } },
+      });
+
       const { rerender } = render(
         <AppBuilderTab serverConfig={serverConfig} serverName="server-1" />,
       );
@@ -452,6 +473,11 @@ describe("AppBuilderTab", () => {
         expect(mockListTools).toHaveBeenCalledWith({
           serverId: "server-1",
         });
+      });
+
+      // Switch to server-2
+      mockUseSharedAppState.mockReturnValue({
+        servers: { "server-2": { connectionStatus: "connected" } },
       });
 
       rerender(
@@ -468,6 +494,11 @@ describe("AppBuilderTab", () => {
     it("resets state when server becomes undefined", async () => {
       const serverConfig = createServerConfig();
 
+      // AgntUX: server-1 connected initially
+      mockUseSharedAppState.mockReturnValue({
+        servers: { "server-1": { connectionStatus: "connected" } },
+      });
+
       const { rerender } = render(
         <AppBuilderTab serverConfig={serverConfig} serverName="server-1" />,
       );
@@ -475,6 +506,9 @@ describe("AppBuilderTab", () => {
       await waitFor(() => {
         expect(mockListTools).toHaveBeenCalled();
       });
+
+      // No connected servers — simulate full disconnect
+      mockUseSharedAppState.mockReturnValue({ servers: {} });
 
       rerender(
         <AppBuilderTab serverConfig={undefined} serverName={undefined} />,

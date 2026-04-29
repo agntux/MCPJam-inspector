@@ -22,4 +22,11 @@ export default defineWorkspace([
       root: "./shared",
     },
   },
+  {
+    extends: "./agntux/vitest.config.ts",
+    test: {
+      name: "agntux",
+      root: "./agntux",
+    },
+  },
 ]);

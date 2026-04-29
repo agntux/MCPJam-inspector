@@ -6,7 +6,7 @@
  * allowing users to execute tools and then chat about the results.
  */
 
-import { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo, useState, useRef } from "react";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Wrench } from "lucide-react";
 import {
@@ -108,6 +108,40 @@ export function AppBuilderTab({
       environment: detectEnvironment(),
     });
   }, []);
+
+  // AgntUX START — Track active plugin slug from ?pluginUrl= auto-install
+  const [activePluginSlug, setActivePluginSlug] = useState<string | null>(null);
+  const [activePluginVersion, setActivePluginVersion] = useState<string | null>(null);
+  // Guard against double-install on strict-mode re-mounts
+  const pluginInstallHandledRef = useRef(false);
+
+  useEffect(() => {
+    // Listen for plugin-installed events dispatched by use-app-state.ts
+    const handlePluginInstalled = (e: Event) => {
+      const detail = (e as CustomEvent<{ slug?: string; version?: string }>).detail;
+      if (detail?.slug) {
+        setActivePluginSlug(detail.slug);
+        setActivePluginVersion(detail.version ?? null);
+      }
+    };
+    window.addEventListener("plugin-installed", handlePluginInstalled);
+
+    // Also read ?pluginUrl= on first mount — if the event already fired before
+    // this component mounted, the slug can be recovered from ?pluginSlug= if
+    // the caller passes it, or left null (the event from use-app-state will
+    // arrive later in the same tick since both run in the same useEffect round).
+    if (!pluginInstallHandledRef.current) {
+      pluginInstallHandledRef.current = true;
+      const params = new URLSearchParams(window.location.search);
+      const preloadedSlug = params.get("pluginSlug");
+      if (preloadedSlug) {
+        setActivePluginSlug(preloadedSlug);
+      }
+    }
+
+    return () => window.removeEventListener("plugin-installed", handlePluginInstalled);
+  }, []);
+  // AgntUX END
 
   // Tools metadata used for deterministic injection and invocation messaging
   const [toolsMetadata, setToolsMetadata] = useState<

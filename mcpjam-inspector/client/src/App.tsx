@@ -29,6 +29,8 @@ import { useEnsureDbUser } from "./hooks/useEnsureDbUser";
 import { usePostHog } from "posthog-js/react";
 import { usePostHogIdentify } from "./hooks/usePostHogIdentify";
 import { AppStateProvider } from "./state/app-state-context";
+// AgntUX: wrapper for AgntUX-mode UI (banner + sandbox panel)
+import { AgntUXWrapper } from "../../agntux/components/index.js";
 
 // Import global styles
 import "./index.css";
@@ -52,6 +54,9 @@ export default function App() {
     string | undefined
   >(undefined);
   const [chatHasMessages, setChatHasMessages] = useState(false);
+  // AgntUX: hoisted plugin slug/version — shared between AgntUXWrapper (banner) and AppBuilderTab (event listener)
+  const [activePluginSlug, setActivePluginSlug] = useState<string | null>(null);
+  const [activePluginVersion, setActivePluginVersion] = useState<string | null>(null);
   const posthog = usePostHog();
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
 
@@ -74,6 +79,19 @@ export default function App() {
   useEffect(() => {
     updateThemeMode(initialThemeMode);
     updateThemePreset(initialThemePreset);
+  }, []);
+
+  // AgntUX: listen for plugin-installed events so AgntUXWrapper banner gets the active slug
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ slug?: string; version?: string }>).detail;
+      if (detail?.slug) {
+        setActivePluginSlug(detail.slug);
+        setActivePluginVersion(detail.version ?? null);
+      }
+    };
+    window.addEventListener("plugin-installed", handler);
+    return () => window.removeEventListener("plugin-installed", handler);
   }, []);
 
   // Set up Electron OAuth callback handling
@@ -348,6 +366,11 @@ export default function App() {
     </div>
   );
 
+  // AgntUX: wrap in AgntUXWrapper only in agntux mode (gated by env var)
+  const isAgntUXMode =
+    (import.meta as unknown as { env?: Record<string, string> }).env
+      ?.VITE_AGNTUX_MODE === "true";
+
   return (
     <PreferencesStoreProvider
       themeMode={initialThemeMode}
@@ -355,7 +378,16 @@ export default function App() {
     >
       <AppStateProvider appState={effectiveAppState}>
         <Toaster />
-        {appContent}
+        {isAgntUXMode ? (
+          <AgntUXWrapper
+            pluginSlug={activePluginSlug ?? undefined}
+            pluginVersion={activePluginVersion ?? undefined}
+          >
+            {appContent}
+          </AgntUXWrapper>
+        ) : (
+          appContent
+        )}
       </AppStateProvider>
     </PreferencesStoreProvider>
   );

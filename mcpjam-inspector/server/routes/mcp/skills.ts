@@ -1,6 +1,7 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import fs from "fs/promises";
 import path from "path";
+import { fileURLToPath } from "node:url";
 import os from "os";
 import "../../types/hono"; // Type extensions
 import { logger } from "../../utils/logger";
@@ -17,7 +18,6 @@ import {
 import type {
   Skill,
   SkillListItem,
-  SkillFile,
   SkillFileContent,
 } from "../../../shared/skill-types";
 
@@ -650,7 +650,12 @@ skills.post("/read-file", async (c) => {
 
 // AgntUX START
 /**
- * Install a skill from a remote URL (fetches SKILL.md content server-side)
+ * Install a skill from a remote URL (fetches SKILL.md content server-side).
+ *
+ * Supports two URL formats:
+ *   - *.md            → existing path: parse + install as a single-skill
+ *   - *.tar.gz/*.zip  → new path: extract plugin tarball, flatten subagents,
+ *                       queue stdio MCP servers, return plugin metadata
  */
 skills.post("/install-from-url", async (c) => {
   try {
@@ -675,6 +680,13 @@ skills.post("/install-from-url", async (c) => {
       );
     }
 
+    // Detect if this is a plugin tarball (.tar.gz or .zip) by extension or content-type
+    if (isTarballOrZipUrl(parsedUrl)) {
+      return installPluginFromTarball(c, url, parsedUrl);
+    }
+
+    // --- Existing SKILL.md path ---
+
     // Fetch SKILL.md content from the remote URL
     let skillMdContent: string;
     try {
@@ -687,6 +699,12 @@ skills.post("/install-from-url", async (c) => {
           },
           502,
         );
+      }
+      // Check content-type for tarball sniff even when extension is missing
+      const ct = response.headers.get("content-type") ?? "";
+      if (isTarballContentType(ct)) {
+        // Re-fetch as tarball (content already consumed; reconstruct with a new request)
+        return installPluginFromTarball(c, url, parsedUrl);
       }
       skillMdContent = await response.text();
     } catch (fetchError) {
@@ -779,6 +797,415 @@ skills.post("/install-from-url", async (c) => {
     );
   }
 });
+
+// ─── Plugin tarball helpers ───────────────────────────────────────────────────
+
+/**
+ * Returns true when the URL pathname ends with a tarball/zip extension.
+ */
+function isTarballOrZipUrl(parsedUrl: URL): boolean {
+  const p = parsedUrl.pathname.toLowerCase();
+  return p.endsWith(".tar.gz") || p.endsWith(".tgz") || p.endsWith(".zip");
+}
+
+/**
+ * Returns true when a Content-Type header indicates a tarball or zip stream.
+ */
+function isTarballContentType(ct: string): boolean {
+  return (
+    ct.includes("application/gzip") ||
+    ct.includes("application/x-gzip") ||
+    ct.includes("application/x-tar") ||
+    ct.includes("application/zip") ||
+    ct.includes("application/x-zip")
+  );
+}
+
+/**
+ * Get the plugins extraction directory: ~/.mcpjam/plugins/{slug}/
+ * Safe path join — slug is validated before use.
+ */
+function getPluginsDir(slug: string): string {
+  return path.join(os.homedir(), ".mcpjam", "plugins", slug);
+}
+
+/**
+ * Interface for a single MCP server entry in .mcp.json.
+ */
+interface McpServerEntry {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+/**
+ * Interface for the plugin.json manifest.
+ */
+interface PluginManifest {
+  slug?: string;
+  name?: string;
+  version?: string;
+  description?: string;
+}
+
+/**
+ * Result returned by /install-from-url for a plugin tarball.
+ */
+interface PluginInstallResult {
+  slug: string;
+  version: string;
+  skillName: string;
+  mcpServers: McpServerEntry[];
+}
+
+/**
+ * Download, extract, parse, and flatten a plugin tarball or zip.
+ */
+async function installPluginFromTarball(
+  c: Context,
+  url: string,
+  parsedUrl: URL,
+): Promise<Response> {
+  // Dynamically import to keep top-level imports clean
+  const tar = await import("tar");
+
+  // 1. Download the archive
+  let archiveBuffer: Buffer;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return c.json(
+        {
+          success: false,
+          error: `Failed to fetch plugin: ${response.status} ${response.statusText}`,
+        },
+        502,
+      );
+    }
+    archiveBuffer = Buffer.from(await response.arrayBuffer());
+  } catch (fetchError) {
+    return c.json(
+      {
+        success: false,
+        error:
+          fetchError instanceof Error
+            ? `Failed to fetch plugin: ${fetchError.message}`
+            : "Failed to fetch plugin",
+      },
+      502,
+    );
+  }
+
+  // 2. Determine archive type and derive a preliminary slug from the URL filename
+  const urlPathname = parsedUrl.pathname.toLowerCase();
+  const isZip = urlPathname.endsWith(".zip");
+
+  // 3. Extract to a temporary directory first, then re-home under the real slug
+  const tmpDir = path.join(os.tmpdir(), `mcpjam-plugin-${Date.now()}`);
+  await fs.mkdir(tmpDir, { recursive: true });
+
+  try {
+    if (isZip) {
+      await extractZipBuffer(archiveBuffer, tmpDir);
+    } else {
+      // .tar.gz / .tgz — write to temp file then extract
+      const tmpTar = path.join(os.tmpdir(), `mcpjam-plugin-${Date.now()}.tar.gz`);
+      await fs.writeFile(tmpTar, archiveBuffer);
+      try {
+        await tar.extract({ file: tmpTar, cwd: tmpDir, strict: false });
+      } finally {
+        await fs.rm(tmpTar, { force: true });
+      }
+    }
+
+    // 4. Locate the content root (may be wrapped in a single top-level directory)
+    const contentRoot = await findArchiveContentRoot(tmpDir);
+
+    // 5. Read plugin.json for slug + version
+    const manifest = await readPluginManifest(contentRoot);
+    const slug = manifest.slug ?? manifest.name ?? deriveSlugFromUrl(parsedUrl);
+    const version = manifest.version ?? "0.0.0";
+
+    // Validate slug is safe for use as a directory name
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      return c.json(
+        {
+          success: false,
+          error: `Plugin slug '${slug}' must contain only lowercase letters, numbers, and hyphens`,
+        },
+        400,
+      );
+    }
+
+    // 6. Move to final location: ~/.mcpjam/plugins/{slug}/
+    const pluginDir = getPluginsDir(slug);
+    await fs.rm(pluginDir, { recursive: true, force: true });
+    await fs.mkdir(path.dirname(pluginDir), { recursive: true });
+
+    // Copy content root to plugin dir (fs.rename across devices fails, so use copy)
+    await copyDirRecursive(contentRoot, pluginDir);
+
+    // 7. Read agents/*.md (sorted alphabetically for deterministic ordering)
+    const agentFiles = await readAgentFiles(pluginDir);
+
+    // 8. Read SKILL.md (root or skills/{slug}/SKILL.md)
+    const skillMdContent = await readPluginSkillMd(pluginDir, slug);
+    if (!skillMdContent) {
+      return c.json(
+        { success: false, error: "Plugin tarball does not contain a SKILL.md" },
+        400,
+      );
+    }
+
+    // 9. Flatten SKILL.md + agents/*.md into one combined skill
+    const { flattenSkill } = await importFlattenSkill();
+    const flattenedContent = flattenSkill(skillMdContent, agentFiles);
+
+    // 10. Parse flattened skill for name/description
+    const parsedSkill = parseSkillFile(flattenedContent, slug);
+    const skillName = parsedSkill?.name ?? slug;
+
+    // 11. Write flattened skill to ~/.mcpjam/skills/{slug}/SKILL.md
+    const skillsDir = getPrimarySkillsDir();
+    const skillDir = path.join(skillsDir, slug);
+    await fs.mkdir(skillDir, { recursive: true });
+    await fs.writeFile(path.join(skillDir, "SKILL.md"), flattenedContent, "utf-8");
+
+    // 12. Read .mcp.json and queue local stdio MCP servers
+    const mcpServers = await readMcpServers(pluginDir);
+
+    const result: PluginInstallResult = {
+      slug,
+      version,
+      skillName,
+      mcpServers,
+    };
+
+    logger.info(`Plugin '${slug}' v${version} installed from ${url}`);
+    return c.json({ success: true, plugin: result });
+  } finally {
+    // Always clean up tmp dir
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Extract a zip buffer to a target directory with zip-slip protection.
+ */
+async function extractZipBuffer(buffer: Buffer, targetDir: string): Promise<void> {
+  const fflate = await import("fflate");
+  const resolvedTarget = path.resolve(targetDir);
+
+  return new Promise((resolve, reject) => {
+    fflate.unzip(new Uint8Array(buffer), (err, unzipped) => {
+      if (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        reject(new Error(`Zip extraction failed: ${msg}`));
+        return;
+      }
+
+      const writePromises: Promise<void>[] = [];
+
+      for (const [relativePath, data] of Object.entries(unzipped)) {
+        // Zip-slip protection: ensure extracted path stays within targetDir
+        const fullPath = path.resolve(targetDir, relativePath);
+        if (!fullPath.startsWith(resolvedTarget + path.sep) && fullPath !== resolvedTarget) {
+          // Skip path traversal attempts silently
+          logger.warn(`Skipping zip entry with path traversal: ${relativePath}`);
+          continue;
+        }
+
+        if (relativePath.endsWith("/")) {
+          // Directory entry — void the return value (mkdir returns string|undefined with recursive)
+          writePromises.push(fs.mkdir(fullPath, { recursive: true }).then(() => undefined as void));
+        } else {
+          // File entry — ensure parent dir exists
+          writePromises.push(
+            fs.mkdir(path.dirname(fullPath), { recursive: true }).then(() =>
+              fs.writeFile(fullPath, Buffer.from(data))
+            ),
+          );
+        }
+      }
+
+      Promise.all(writePromises).then(() => resolve()).catch(reject);
+    });
+  });
+}
+
+/**
+ * Find the actual content root inside an extracted archive.
+ * If the archive contains a single top-level directory, descend into it.
+ */
+async function findArchiveContentRoot(extractDir: string): Promise<string> {
+  const entries = await fs.readdir(extractDir, { withFileTypes: true });
+  const dirs = entries.filter((e) => e.isDirectory());
+  const files = entries.filter((e) => e.isFile());
+
+  // If there's exactly one directory and no files, descend into it
+  if (dirs.length === 1 && files.length === 0) {
+    return path.join(extractDir, dirs[0].name);
+  }
+
+  return extractDir;
+}
+
+/**
+ * Read and parse plugin.json from the content root.
+ */
+async function readPluginManifest(contentRoot: string): Promise<PluginManifest> {
+  // Try .claude-plugin/plugin.json first (spec), then plugin.json at root
+  const candidates = [
+    path.join(contentRoot, ".claude-plugin", "plugin.json"),
+    path.join(contentRoot, "plugin.json"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const raw = await fs.readFile(candidate, "utf-8");
+      return JSON.parse(raw) as PluginManifest;
+    } catch {
+      // Continue
+    }
+  }
+
+  return {};
+}
+
+/**
+ * Derive a URL-safe slug from the archive filename.
+ */
+function deriveSlugFromUrl(parsedUrl: URL): string {
+  const basename = path.basename(parsedUrl.pathname);
+  return basename
+    .replace(/\.(tar\.gz|tgz|zip)$/i, "")
+    .replace(/[^a-z0-9-]/gi, "-")
+    .toLowerCase()
+    .replace(/^-+|-+$/g, "")
+    || "plugin";
+}
+
+/**
+ * Read agents/*.md files sorted alphabetically (deterministic ordering).
+ * Returns an array of { filename, content } objects.
+ */
+async function readAgentFiles(
+  pluginDir: string,
+): Promise<Array<{ filename: string; content: string }>> {
+  const agentsDir = path.join(pluginDir, "agents");
+  try {
+    const entries = await fs.readdir(agentsDir, { withFileTypes: true });
+    const mdFiles = entries
+      .filter((e) => e.isFile() && e.name.endsWith(".md"))
+      .map((e) => e.name)
+      .sort(); // Alphabetical — deterministic
+
+    const results: Array<{ filename: string; content: string }> = [];
+    for (const filename of mdFiles) {
+      const content = await fs.readFile(path.join(agentsDir, filename), "utf-8");
+      results.push({ filename, content });
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Read SKILL.md from the plugin directory.
+ * Searches: skills/{slug}/SKILL.md, then root SKILL.md.
+ */
+async function readPluginSkillMd(
+  pluginDir: string,
+  slug: string,
+): Promise<string | null> {
+  const candidates = [
+    path.join(pluginDir, "skills", slug, "SKILL.md"),
+    path.join(pluginDir, "SKILL.md"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await fs.readFile(candidate, "utf-8");
+    } catch {
+      // Continue
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Read .mcp.json and return stdio MCP server entries.
+ * HTTP/SSE servers are excluded — only local stdio servers are queued.
+ */
+async function readMcpServers(pluginDir: string): Promise<McpServerEntry[]> {
+  const mcpJsonPath = path.join(pluginDir, ".mcp.json");
+  try {
+    const raw = await fs.readFile(mcpJsonPath, "utf-8");
+    const parsed = JSON.parse(raw) as {
+      mcpServers?: Record<string, McpServerEntry & { type?: string; url?: string }>;
+    };
+
+    if (!parsed.mcpServers) return [];
+
+    return Object.values(parsed.mcpServers).filter(
+      (s) =>
+        // Include only stdio servers (no url/type=sse/type=http)
+        !s.url && s.type !== "sse" && s.type !== "http" && s.command,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Copy a directory recursively (used to move content across devices).
+ * Safe: validates that destination stays within parentDir.
+ */
+async function copyDirRecursive(src: string, dest: string): Promise<void> {
+  await fs.mkdir(dest, { recursive: true });
+  const entries = await fs.readdir(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    // Path traversal guard
+    if (!destPath.startsWith(dest + path.sep) && destPath !== dest) {
+      continue;
+    }
+
+    if (entry.isDirectory()) {
+      await copyDirRecursive(srcPath, destPath);
+    } else {
+      await fs.copyFile(srcPath, destPath);
+    }
+  }
+}
+
+/**
+ * Dynamically import the flatten-skill helper.
+ * Kept as a dynamic import so the helper can be a plain .js module.
+ */
+async function importFlattenSkill(): Promise<{
+  flattenSkill: (
+    skillMd: string,
+    agents: Array<{ filename: string; content: string }>,
+  ) => string;
+}> {
+  // Resolve relative to this file at runtime
+  const helperPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../agntux/host-emulator/lib/flatten-skill.js",
+  );
+  return import(helperPath) as Promise<{
+    flattenSkill: (
+      skillMd: string,
+      agents: Array<{ filename: string; content: string }>,
+    ) => string;
+  }>;
+}
 // AgntUX END
 
 export default skills;
